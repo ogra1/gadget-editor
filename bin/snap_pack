@@ -1,0 +1,428 @@
+#!/usr/bin/env python3
+"""
+Full implementation of snap pack command for repacking snap directories
+into valid snap packages compatible with snap store upload.
+"""
+
+import os
+import sys
+import subprocess
+import shutil
+from pathlib import Path
+import yaml
+
+def validate_snap_structure(snap_dir):
+    """Validate that the snap directory has proper structure for packaging."""
+    snap_path = Path(snap_dir)
+    
+    if not snap_path.exists():
+        raise FileNotFoundError(f"Snap directory does not exist: {snap_dir}")
+    
+    if not snap_path.is_dir():
+        raise NotADirectoryError(f"Snap directory is not a directory: {snap_dir}")
+    
+    # Check for required meta/snap.yaml file
+    meta_dir = snap_path / "meta"
+    snap_yaml_path = meta_dir / "snap.yaml"
+    
+    if not snap_yaml_path.exists():
+        raise FileNotFoundError("Required meta/snap.yaml file not found in snap directory")
+    
+    # Validate snap.yaml content
+    try:
+        with open(snap_yaml_path, 'r') as f:
+            yaml_content = f.read()
+            yaml.safe_load(yaml_content)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Invalid YAML in snap.yaml: {e}")
+
+def validate_essential_snap_fields(snap_yaml_path):
+    """Validate essential snap.yaml fields to ensure the package will work correctly."""
+    try:
+        with open(snap_yaml_path, 'r') as f:
+            yaml_data = yaml.safe_load(f)
+        
+        if not yaml_data:
+            raise ValueError("snap.yaml is empty or invalid")
+        
+        # Validate required fields
+        if 'name' not in yaml_data:
+            raise ValueError("snap.yaml missing required 'name' field")
+        
+        name = yaml_data['name']
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("snap.yaml 'name' field must be a non-empty string")
+        
+        # Validate name format (ASCII, lowercase, hyphens, numbers, max 40 chars)
+        if not name[0].isascii() or not name[0].islower():
+            raise ValueError("snap.yaml 'name' must start with lowercase ASCII character")
+        
+        if len(name) > 40:
+            raise ValueError("snap.yaml 'name' must be 40 characters or less")
+        
+        # Check for valid characters in name
+        valid_chars = set('abcdefghijklmnopqrstuvwxyz0123456789-')
+        if not all(c in valid_chars for c in name):
+            raise ValueError("snap.yaml 'name' contains invalid characters")
+        
+        if name.startswith('-') or name.endswith('-'):
+            raise ValueError("snap.yaml 'name' cannot start or end with hyphen")
+        
+        if 'version' not in yaml_data:
+            raise ValueError("snap.yaml missing required 'version' field")
+        
+        version = yaml_data['version']
+        if not isinstance(version, str) or not version.strip():
+            raise ValueError("snap.yaml 'version' field must be a non-empty string")
+        
+        if 'summary' not in yaml_data:
+            raise ValueError("snap.yaml missing required 'summary' field")
+        
+        summary = yaml_data['summary']
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError("snap.yaml 'summary' field must be a non-empty string")
+        
+        if len(summary) > 78:
+            raise ValueError("snap.yaml 'summary' must be 78 characters or less")
+        
+        if 'confinement' not in yaml_data:
+            raise ValueError("snap.yaml missing required 'confinement' field")
+        
+        confinement = yaml_data['confinement']
+        if confinement not in ['strict', 'classic', 'devmode']:
+            raise ValueError("snap.yaml 'confinement' must be 'strict', 'classic', or 'devmode'")
+        
+        if 'grade' not in yaml_data:
+            raise ValueError("snap.yaml missing required 'grade' field")
+        
+        grade = yaml_data['grade']
+        if grade not in ['stable', 'devel']:
+            raise ValueError("snap.yaml 'grade' must be 'stable' or 'devel'")
+        
+        # Validate gadget snap requirements
+        snap_type = yaml_data.get('type')
+        if snap_type == 'gadget':
+            # For gadget snaps, verify gadget.yaml exists
+            meta_dir = snap_yaml_path.parent
+            gadget_yaml_path = meta_dir / "gadget.yaml"
+            if not gadget_yaml_path.exists():
+                raise ValueError("Gadget snap requires meta/gadget.yaml file")
+        
+        print("Essential snap.yaml fields validated successfully")
+        
+    except Exception as e:
+        raise ValueError(f"Validation failed for snap.yaml: {e}")
+
+def detect_snapcraft_yaml_differences(snap_dir):
+    """
+    Detect when snapcraft.yaml and snap.yaml have different values for the same fields.
+    This catches cases where users modified snapcraft.yaml but didn't update snap.yaml.
+    """
+    snap_path = Path(snap_dir)
+    meta_dir = snap_path / "meta"
+    
+    # Check if both files exist (snapcraft.yaml in snap/ directory, snap.yaml in meta/)
+    snapcraft_yaml_path = snap_path / "snap" / "snapcraft.yaml"  # Correct location
+    snap_yaml_path = meta_dir / "snap.yaml"
+    
+    if not snapcraft_yaml_path.exists() or not snap_yaml_path.exists():
+        return  # No comparison possible
+    
+    try:
+        # Load both files
+        with open(snapcraft_yaml_path, 'r') as f:
+            snapcraft_data = yaml.safe_load(f)
+        
+        with open(snap_yaml_path, 'r') as f:
+            snap_data = yaml.safe_load(f)
+        
+        # Common fields that should match between snapcraft.yaml and snap.yaml
+        fields_to_check = ['name', 'version', 'summary', 'description', 'grade', 'confinement']
+        
+        warnings = []
+        
+        for field in fields_to_check:
+            snapcraft_value = snapcraft_data.get(field) if snapcraft_data else None
+            snap_value = snap_data.get(field) if snap_data else None
+            
+            # If both files have the same field and different values, warn
+            if snapcraft_value is not None and snap_value is not None:
+                if snapcraft_value != snap_value:
+                    warnings.append(f"Field '{field}': snapcraft.yaml has '{snapcraft_value}' but snap.yaml has '{snap_value}'")
+            elif snapcraft_value is not None and snap_value is None:
+                warnings.append(f"Field '{field}': snapcraft.yaml has '{snapcraft_value}' but snap.yaml is missing or empty")
+        
+        if warnings:
+            print("Warning: Potential inconsistencies detected between snapcraft.yaml and snap.yaml:")
+            for warning in warnings:
+                print(f"  {warning}")
+            print("Note: snapcraft.yaml fields are build-time only. Runtime behavior is controlled by snap.yaml.")
+            print("Changes to snapcraft.yaml will NOT affect the runtime behavior of this snap package.")
+        
+    except Exception as e:
+        # Silently ignore validation errors - this is just a warning feature
+        pass
+
+def detect_snap_type(snap_dir):
+    """Detect the type of snap to determine special handling requirements."""
+    snap_path = Path(snap_dir)
+    meta_dir = snap_path / "meta"
+    
+    # Check for snap.yaml to determine snap type
+    snap_yaml_path = meta_dir / "snap.yaml"
+    if snap_yaml_path.exists():
+        try:
+            with open(snap_yaml_path, 'r') as f:
+                yaml_content = f.read()
+                yaml_data = yaml.safe_load(yaml_content)
+                if yaml_data and 'type' in yaml_data:
+                    return yaml_data['type']
+        except Exception:
+            pass
+    
+    # Check for gadget.yaml which is specific to gadget snaps
+    gadget_yaml_path = meta_dir / "gadget.yaml"
+    if gadget_yaml_path.exists():
+        # If gadget.yaml exists but no type specified in snap.yaml, it's probably a gadget snap
+        return "gadget"
+    
+    # Default to app type
+    return "app"
+
+def get_compression_from_yaml(yaml_path):
+    """Extract compression settings from snap.yaml or snapcraft.yaml."""
+    if not yaml_path.exists():
+        return None
+    
+    try:
+        with open(yaml_path, 'r') as f:
+            yaml_content = f.read()
+            yaml_data = yaml.safe_load(yaml_content)
+            
+            # Check if compression is specified in the yaml
+            if 'compression' in yaml_data:
+                return yaml_data['compression']
+            elif 'build-options' in yaml_data and 'compression' in yaml_data['build-options']:
+                return yaml_data['build-options']['compression']
+    except Exception:
+        pass
+    
+    return None
+
+def determine_compression(snap_dir):
+    """Determine the appropriate compression algorithm to use."""
+    snap_path = Path(snap_dir)
+    
+    # Look for snap.yaml or snapcraft.yaml to check for compression settings
+    snap_yaml_path = snap_path / "snap.yaml"
+    snapcraft_yaml_path = snap_path / "snap" / "snapcraft.yaml"  # Correct location
+    
+    # Check snap.yaml first
+    compression = get_compression_from_yaml(snap_yaml_path)
+    if compression:
+        return compression
+    
+    # Check snapcraft.yaml if snap.yaml doesn't specify compression
+    compression = get_compression_from_yaml(snapcraft_yaml_path)
+    if compression:
+        return compression
+    
+    # Default to xz compression (standard for snaps)
+    return "xz"
+
+def extract_name_and_version(snap_yaml_path):
+    """Extract name and version from snap.yaml file."""
+    try:
+        with open(snap_yaml_path, 'r') as f:
+            yaml_content = f.read()
+            yaml_data = yaml.safe_load(yaml_content)
+            
+            name = yaml_data.get('name', 'unknown')
+            version = yaml_data.get('version', '0.0.0')
+            
+            return name, version
+    except Exception as e:
+        return 'unknown', '0.0.0'
+
+def check_mksquashfs_availability():
+    """Robust check for mksquashfs availability."""
+    try:
+        # Try different approaches to check for mksquashfs
+        result = subprocess.run(['which', 'mksquashfs'], 
+                               stdout=subprocess.PIPE, 
+                               stderr=subprocess.PIPE, 
+                               text=True)
+        if result.returncode == 0:
+            return True
+        
+        # Try another approach
+        result = subprocess.run(['command', '-v', 'mksquashfs'], 
+                               stdout=subprocess.PIPE, 
+                               stderr=subprocess.PIPE, 
+                               text=True)
+        if result.returncode == 0:
+            return True
+            
+        # Try direct execution test
+        result = subprocess.run(['mksquashfs', '--help'], 
+                               stdout=subprocess.PIPE, 
+                               stderr=subprocess.PIPE, 
+                               text=True)
+        return result.returncode == 0
+        
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+def create_snap_package(snap_dir, output_file=None):
+    """Create a valid snap package (.snap file) from a snap directory structure.
+    
+    Args:
+        snap_dir (str): Path to the snap directory containing meta/snap.yaml
+        output_file (str): Path to the output .snap file (optional)
+    
+    Returns:
+        str: Path to the created snap package
+    """
+    
+    snap_path = Path(snap_dir)
+    
+    # Validate the snap structure
+    validate_snap_structure(snap_dir)
+    
+    # Validate essential snap.yaml fields
+    meta_dir = snap_path / "meta"
+    snap_yaml_path = meta_dir / "snap.yaml"
+    validate_essential_snap_fields(snap_yaml_path)
+    
+    # Detect potential snapcraft.yaml vs snap.yaml inconsistencies
+    detect_snapcraft_yaml_differences(snap_dir)
+    
+    # Validate gadget snap requirements
+    validate_gadget_snap_requirements(snap_dir)
+    
+    # Detect snap type
+    snap_type = detect_snap_type(snap_dir)
+    print(f"Detected snap type: {snap_type}")
+    
+    # Determine compression algorithm
+    compression = determine_compression(snap_dir)
+    print(f"Using compression: {compression}")
+    
+    # Extract name and version for proper naming
+    name, version = extract_name_and_version(snap_yaml_path)
+    print(f"Package name: {name}")
+    print(f"Package version: {version}")
+    
+    # Determine output filename
+    if output_file is None:
+        # Use the standard naming convention: $name_$version.snap
+        output_file = f"{name}_{version}.snap"
+        print(f"Generated output file name: {output_file}")
+    else:
+        # If output file is specified, use it as-is
+        print(f"Using specified output file name: {output_file}")
+    
+    # Check if mksquashfs is available
+    if not check_mksquashfs_availability():
+        raise RuntimeError("mksquashfs is not available on this system. Please install squashfs-tools package.")
+    
+    print(f"Creating snap package from {snap_dir}")
+    print(f"Output file: {output_file}")
+    print(f"Compression method: {compression}")
+    print(f"Snap type: {snap_type}")
+    
+    # Create temporary directory for squashfs creation
+    temp_dir = Path(f"{output_file}.tmp")
+    temp_dir.mkdir(exist_ok=True)
+    
+    try:
+        # Copy all files from snap directory to temp directory
+        for item in snap_path.iterdir():
+            if item.is_dir():
+                shutil.copytree(item, temp_dir / item.name)
+            else:
+                shutil.copy2(item, temp_dir / item.name)
+        
+        # Create the squashfs filesystem using mksquashfs
+        squashfs_file = f"{output_file}.squashfs"
+        
+        # Build command with appropriate compression
+        cmd = [
+            'mksquashfs',
+            str(temp_dir),
+            squashfs_file,
+            '-comp', compression,  # Use specified compression
+            '-no-progress',  # Don't show progress bar
+            '-all-root',  # Set all files to root ownership
+            '-no-xattrs'   # Don't store extended attributes
+        ]
+        
+        print(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"mksquashfs failed: {result.stderr}")
+        
+        # Rename to .snap format
+        os.rename(squashfs_file, output_file)
+        
+        # Clean up temporary directory
+        shutil.rmtree(temp_dir)
+        
+        # Verify the created file exists and is valid
+        if not os.path.exists(output_file):
+            raise RuntimeError(f"Failed to create snap package: {output_file}")
+        
+        print(f"Successfully created snap package: {output_file}")
+        return output_file
+        
+    except Exception as e:
+        # Clean up temporary directory on error
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        raise e
+
+def validate_gadget_snap_requirements(snap_dir):
+    """Validate that gadget snaps have all required files."""
+    snap_path = Path(snap_dir)
+    meta_dir = snap_path / "meta"
+    
+    # Check snap.yaml exists (required for all snaps)
+    snap_yaml_path = meta_dir / "snap.yaml"
+    if not snap_yaml_path.exists():
+        raise FileNotFoundError("Required meta/snap.yaml file not found in snap directory")
+    
+    # Check if snap.yaml defines type: gadget
+    try:
+        with open(snap_yaml_path, 'r') as f:
+            yaml_content = f.read()
+            yaml_data = yaml.safe_load(yaml_content)
+            if yaml_data and yaml_data.get('type') == 'gadget':
+                # Gadget snaps require gadget.yaml
+                gadget_yaml_path = meta_dir / "gadget.yaml"
+                if not gadget_yaml_path.exists():
+                    raise FileNotFoundError("Gadget snaps require meta/gadget.yaml file")
+    except Exception:
+        pass
+
+def main():
+    """Main function for command-line usage."""
+    if len(sys.argv) < 2:
+        print("Usage: snap_pack <snap_directory> [output_file]")
+        print("Example: snap_pack ./my-snap ./my-app.snap")
+        print("\nRepacks existing snap directory structures into valid .snap files")
+        print("Following standard snap naming convention: $name_$version.snap")
+        return
+    
+    snap_dir = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    
+    try:
+        result = create_snap_package(snap_dir, output_file)
+        print(f"Successfully created valid snap package: {result}")
+        print("This snap package should be compatible with snap store upload")
+    except Exception as e:
+        print(f"Error creating snap package: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

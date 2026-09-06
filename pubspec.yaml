@@ -1,0 +1,24 @@
+name: gadget_editor
+description: A gadget editor for Ubuntu snaps
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  yaru: ^10.2.0
+  yaml: ^3.1.1
+  path: ^1.8.3
+  file_selector: ^1.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
