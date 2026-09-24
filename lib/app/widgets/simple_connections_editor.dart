@@ -27,7 +27,7 @@ class SimpleConnectionsEditor extends StatefulWidget {
 class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
   late List<Map<String, dynamic>> connectionsList;
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form fields
   final _plugSnapIdController = TextEditingController();
   final _plugController = TextEditingController();
@@ -42,11 +42,11 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
 
   void _parseConnections() {
     connectionsList = [];
-    
+
     if (widget.connections is YamlMap) {
       // Convert YamlMap to Map<String, dynamic> properly
       final yamlMap = widget.connections.cast<String, dynamic>();
-      
+
       yamlMap.forEach((key, value) {
         if (value is YamlMap) {
           connectionsList.add({
@@ -63,10 +63,10 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
               // Parse the combined format for plug and slot
               String? plug = item['plug'];
               String? slot = item['slot'];
-              
+
               String? plugSnapId;
               String? plugInterface;
-              
+
               if (plug != null && plug.contains(':')) {
                 final parts = plug.split(':');
                 if (parts.length >= 2) {
@@ -74,10 +74,10 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
                   plugInterface = parts.sublist(1).join(':');
                 }
               }
-              
+
               String? slotSnapId;
               String? slotInterface;
-              
+
               if (slot != null && slot.contains(':')) {
                 final parts = slot.split(':');
                 if (parts.length >= 2) {
@@ -85,7 +85,7 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
                   slotInterface = parts.sublist(1).join(':');
                 }
               }
-              
+
               connectionsList.add({
                 'name': item['name'] ?? '${plug ?? ''}-${slot ?? ''}',
                 'plug': plugInterface ?? plug,
@@ -101,16 +101,16 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
     } else if (widget.connections is List) {
       // Create a mutable copy of the List
       final mutableList = List.from(widget.connections);
-      
+
       for (var item in mutableList) {
         if (item is YamlMap) {
           // Parse the combined format for plug and slot
           String? plug = item['plug'];
           String? slot = item['slot'];
-          
+
           String? plugSnapId;
           String? plugInterface;
-          
+
           if (plug != null && plug.contains(':')) {
             final parts = plug.split(':');
             if (parts.length >= 2) {
@@ -118,10 +118,10 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
               plugInterface = parts.sublist(1).join(':');
             }
           }
-          
+
           String? slotSnapId;
           String? slotInterface;
-          
+
           if (slot != null && slot.contains(':')) {
             final parts = slot.split(':');
             if (parts.length >= 2) {
@@ -129,7 +129,7 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
               slotInterface = parts.sublist(1).join(':');
             }
           }
-          
+
           connectionsList.add({
             'name': item['name'] ?? '${plug ?? ''}-${slot ?? ''}',
             'plug': plugInterface ?? plug,
@@ -157,7 +157,7 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
     if (snapId == null || snapId.isEmpty) {
       return true; // Empty is allowed for optional fields
     }
-    
+
     // Snap IDs are exactly 32 characters
     return snapId.length == 32;
   }
@@ -201,55 +201,55 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
       final plug = _plugController.text.trim();
       final slotSnapId = _slotSnapIdController.text.trim();
       final slot = _slotController.text.trim();
-      
+
       // Validate inputs
       if (plug.isEmpty) {
         widget.onStatusUpdate('Error: Please enter a plug');
         return;
       }
-      
+
       // Validate snap ID formats
       if (plugSnapId.isNotEmpty && !_isValidSnapId(plugSnapId)) {
         widget.onStatusUpdate('Error: Invalid plug snap ID format. Must be 32 characters');
         return;
       }
-      
+
       if (slotSnapId.isNotEmpty && !_isValidSnapId(slotSnapId)) {
         widget.onStatusUpdate('Error: Invalid slot snap ID format. Must be 32 characters');
         return;
       }
-      
+
       // Validate that if snap IDs are provided, interfaces are also provided
       if (!_validatePlugConnection(plugSnapId, plug)) {
         widget.onStatusUpdate('Error: Plug requires snap ID and interface name');
         return;
       }
-      
+
       if (!_validateSlotConnection(slotSnapId, slot)) {
         widget.onStatusUpdate('Error: Slot requires snap ID and interface name');
         return;
       }
-      
+
       // Read the existing file content
       final file = File(widget.filePath!);
       final content = await file.readAsString();
-      
+
       // Parse the existing YAML
       final yaml = loadYaml(content);
-      
+
       // Create a YamlEditor instance to properly handle the YAML structure
       final yamlEditor = YamlEditor(content);
-      
+
       // Create the new connection
       Map<String, dynamic> newConnection = {};
-      
+
       // Build plug string
       if (plugSnapId.isNotEmpty) {
         newConnection['plug'] = '$plugSnapId:$plug';
       } else {
         newConnection['plug'] = plug;
       }
-      
+
       // Build slot string if provided
       if (slot.isNotEmpty) {
         if (slotSnapId.isNotEmpty) {
@@ -258,13 +258,13 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
           newConnection['slot'] = slot;
         }
       }
-      
+
       // Handle connections structure - THIS IS THE CORRECT APPROACH
       if (yaml.containsKey('connections')) {
         // Connections already exists - update it properly
         final existingConnections = yaml['connections'];
         List<dynamic> updatedConnections;
-        
+
         if (existingConnections is List) {
           updatedConnections = List.from(existingConnections);
         } else if (existingConnections is YamlMap) {
@@ -276,7 +276,7 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
         } else {
           updatedConnections = [newConnection];
         }
-        
+
         // Add new connection to the list - avoiding duplicates
         bool connectionExists = false;
         for (var existing in updatedConnections) {
@@ -285,11 +285,11 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
             break;
           }
         }
-        
+
         if (!connectionExists) {
           updatedConnections.add(newConnection);
         }
-        
+
         // Update connections directly
         yamlEditor.update(['connections'], updatedConnections);
       } else {
@@ -297,33 +297,33 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
         // The key is to parse the root structure and rebuild it
         final rootMap = yamlEditor.parseAt([]) as YamlMap;
         final updatedRoot = Map.from(rootMap);
-        
+
         // Add the new connections section to the updated root
         updatedRoot['connections'] = [newConnection];
-        
+
         // Use wrapAsYamlNode but with careful formatting to avoid quotes
         // The approach from the other AI example - rebuild the entire structure
         yamlEditor.update([], wrapAsYamlNode(updatedRoot, collectionStyle: CollectionStyle.BLOCK));
       }
-      
+
       // Write back to file using yaml_editor's toString() method
       final newYamlString = yamlEditor.toString();
-      
+
       // Write back to file
       await file.writeAsString(newYamlString);
-      
+
       // Show success message via status bar
       widget.onStatusUpdate('Connection added successfully');
-      
+
       // Notify parent that changes were saved
       widget.onSave([newConnection]);
-      
+
       // Clear form fields
       _plugSnapIdController.clear();
       _plugController.clear();
       _slotSnapIdController.clear();
       _slotController.clear();
-      
+
     } catch (e) {
       widget.onStatusUpdate('Error saving changes: $e');
     }

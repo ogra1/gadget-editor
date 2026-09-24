@@ -20,17 +20,17 @@ class ChannelListItem extends StatelessWidget {
     final risk = channelInfo['risk'] as String?;
     final architecture = channelInfo['architecture'] as String?;
     final track = channelInfo['track'] as String?;
-    
+
     // Format track/risk display
     String trackRiskDisplay = '${track ?? 'unknown'}/${risk ?? 'unknown'}';
-    
+
     // Check if this channel is selected
     bool isSelected = false;
     if (selectedChannel != null) {
       isSelected = selectedChannel?['channel']?['track'] == track &&
                   selectedChannel?['channel']?['risk'] == risk;
     }
-    
+
     if (isSelected) {
       // Show selected channel with special styling
       return Container(

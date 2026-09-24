@@ -104,22 +104,22 @@ class GadgetSection extends StatelessWidget {
     if (data == null) {
       return const Text('No data');
     }
-    
+
     // Special handling for connections to match the editor style
     if (title == 'Connections') {
       return _buildConnectionsContent(context, data);
     }
-    
+
     // Special handling for defaults to show hierarchical structure
     if (title == 'Defaults') {
       return _buildDefaultsContent(context, data);
     }
-    
+
     // Special handling for kernel cmdline to group by allow/append/remove
     if (title == 'Boot Options') {
       return _buildKernelCmdlineContent(context, data);
     }
-    
+
     // Handle single key-value maps specially
     if (data is Map && data.length == 1) {
       // For single key-value pairs, display them cleanly on one line
@@ -142,7 +142,7 @@ class GadgetSection extends StatelessWidget {
         ],
       );
     }
-    
+
     if (data is YamlMap) {
       if (data.isEmpty) {
         return const Text('No data');
@@ -174,7 +174,7 @@ class GadgetSection extends StatelessWidget {
         }).toList(),
       );
     }
-    
+
     if (data is List) {
       if (data.isEmpty) {
         return const Text('No data');
@@ -206,7 +206,7 @@ class GadgetSection extends StatelessWidget {
         }).toList(),
       );
     }
-    
+
     // Handle primitive values
     return Text('$data');
   }
@@ -273,17 +273,17 @@ class GadgetSection extends StatelessWidget {
       final allowList = data['allow'] is List ? data['allow'] as List : [];
       final appendList = data['append'] is List ? data['append'] as List : [];
       final removeList = data['remove'] is List ? data['remove'] as List : [];
-      
+
       // Only show groups that have content
       final groups = <String, List<dynamic>>{};
       if (allowList.isNotEmpty) groups['allow'] = allowList;
       if (appendList.isNotEmpty) groups['append'] = appendList;
       if (removeList.isNotEmpty) groups['remove'] = removeList;
-      
+
       if (groups.isEmpty) {
         return const Text('No kernel cmdline options defined.');
       }
-      
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -341,7 +341,7 @@ class GadgetSection extends StatelessWidget {
         ],
       );
     }
-    
+
     // Handle other kernel-cmdline structures - ensure we don't show raw data
     return Container(
       padding: const EdgeInsets.all(8),
@@ -379,7 +379,7 @@ class GadgetSection extends StatelessWidget {
           ...data.asMap().entries.map((entry) {
             final index = entry.key;
             final connection = entry.value;
-            
+
             // Build connection display with proper styling and delete button
             return Card(
               margin: const EdgeInsets.symmetric(vertical: 4),
@@ -469,7 +469,7 @@ class GadgetSection extends StatelessWidget {
         children: data.entries.map((entry) {
           final key = entry.key;
           final value = entry.value;
-          
+
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 4),
             child: Padding(
@@ -508,7 +508,7 @@ class GadgetSection extends StatelessWidget {
         }).toList(),
       );
     }
-    
+
     // Handle other default structures
     return _buildValueWidget(context, data);
   }
@@ -517,7 +517,7 @@ class GadgetSection extends StatelessWidget {
     if (value == null) {
       return const Text('null');
     }
-    
+
     // Handle multiline strings (like the LXD example with |)
     if (value is String && value.contains('\n')) {
       // For multiline values, we'll display them in a code-like format
@@ -540,7 +540,7 @@ class GadgetSection extends StatelessWidget {
         ),
       );
     }
-    
+
     if (value is YamlMap) {
       if (value.isEmpty) {
         return const Text('(empty)');
@@ -573,7 +573,7 @@ class GadgetSection extends StatelessWidget {
         }).toList(),
       );
     }
-    
+
     if (value is List) {
       if (value.isEmpty) {
         return const Text('(empty)');
@@ -600,7 +600,7 @@ class GadgetSection extends StatelessWidget {
         ),
       );
     }
-    
+
     // Handle primitive values
     return Text('$value');
   }

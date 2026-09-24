@@ -26,7 +26,7 @@ class SimpleDefaultsEditor extends StatefulWidget {
 class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
   late List<Map<String, dynamic>> defaultsList;
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form fields
   final _snapIdController = TextEditingController();
   final _keyController = TextEditingController();
@@ -42,7 +42,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
 
   void _parseDefaults() {
     defaultsList = [];
-    
+
     // Handle the case where defaults is a YamlMap
     if (widget.defaults is YamlMap) {
       final yamlMap = widget.defaults;
@@ -88,7 +88,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
     if (snapId == null || snapId.isEmpty) {
       return true; // Empty is allowed for optional fields
     }
-    
+
     // Snap IDs are either exactly 32 characters or "system"
     return (snapId.length == 32) || (snapId == 'system');
   }
@@ -104,47 +104,47 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
       // Get the snap ID and key from the form
       final snapId = _snapIdController.text.trim();
       final key = _keyController.text.trim();
-      
+
       // Get the value - use multiline controller if expanded, otherwise regular controller
       final value = _isMultilineExpanded 
           ? _multilineController.text.trim() 
           : _valueController.text.trim();
-      
+
       // Validate inputs - all fields are required
       if (snapId.isEmpty) {
         widget.onStatusUpdate('Error: Please enter a snap ID');
         return;
       }
-      
+
       if (key.isEmpty) {
         widget.onStatusUpdate('Error: Please enter a key');
         return;
       }
-      
+
       if (value.isEmpty) {
         widget.onStatusUpdate('Error: Please enter a value');
         return;
       }
-      
+
       // Validate snap ID format
       if (!_isValidSnapId(snapId)) {
         widget.onStatusUpdate('Error: Invalid snap ID format. Must be 32 characters or "system"');
         return;
       }
-      
+
       // Read the existing file content
       final file = File(widget.filePath!);
       final content = await file.readAsString();
-      
+
       // Parse the existing YAML
       final yaml = loadYaml(content);
-      
+
       // Create a YamlEditor instance to properly handle the YAML structure
       final yamlEditor = YamlEditor(content);
-      
+
       // Handle nested structure in defaults - THIS IS THE CORRECT APPROACH
       Map<String, dynamic> updatedDefaults = {};
-      
+
       // If defaults already exists, copy it
       if (yaml.containsKey('defaults') && yaml['defaults'] is Map) {
         final existingDefaults = yaml['defaults'] as Map;
@@ -158,19 +158,19 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
         }
         updatedDefaults = map;
       }
-      
+
       // Create the proper nested structure for snap ID -> key path -> value
       Map<String, dynamic> snapDefaults = updatedDefaults;
-      
+
       // Create snap ID entry if it doesn't exist
       if (!snapDefaults.containsKey(snapId)) {
         snapDefaults[snapId] = {};
       }
-      
+
       // Ensure we're working with a proper Map<String, dynamic> for the snap level
       dynamic snapLevel = snapDefaults[snapId];
       Map<String, dynamic> currentLevel;
-      
+
       // Handle conversion from YamlMap to Map<String, dynamic> if needed
       if (snapLevel is YamlMap) {
         final map = <String, dynamic>{};
@@ -186,10 +186,10 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
         snapDefaults[snapId] = <String, dynamic>{};
         currentLevel = snapDefaults[snapId] as Map<String, dynamic>;
       }
-      
+
       // Parse the key to handle nested structure (e.g., "foo.bar.baz")
       final keyParts = key.split('.');
-      
+
       // Navigate to the parent level of the key
       for (int i = 0; i < keyParts.length - 1; i++) {
         final part = keyParts[i];
@@ -220,10 +220,10 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
           }
         }
       }
-      
+
       // Set the final value - ensure proper formatting without quotes
       final lastKey = keyParts.last;
-      
+
       // Handle multiline values properly by using wrapAsYamlNode
       dynamic yamlValue;
       if (_isMultilineExpanded && value.isNotEmpty) {
@@ -252,9 +252,9 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
           yamlValue = value;
         }
       }
-      
+
       currentLevel[lastKey] = yamlValue;
-      
+
       // Handle the case where defaults section already exists vs needs to be created
       if (yaml.containsKey('defaults')) {
         // Update existing defaults section
@@ -264,25 +264,25 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
         final rootMap = yamlEditor.parseAt([]) as YamlMap;
         final updatedRoot = Map.from(rootMap);
         updatedRoot['defaults'] = updatedDefaults;
-        
+
         // Use wrapAsYamlNode with proper formatting to avoid quotes
         final wrappedRoot = wrapAsYamlNode(updatedRoot, collectionStyle: CollectionStyle.BLOCK);
         yamlEditor.update([], wrappedRoot);
       }
-      
+
       // Write back to file using yaml_editor's toString() method
       final newYamlString = yamlEditor.toString();
-      
+
       // Write back to file
       await file.writeAsString(newYamlString);
-      
+
       // Show success message via status bar
       widget.onStatusUpdate('Default added successfully');
-      
+
       // Notify parent that changes were saved
       // We pass the updated defaults to trigger a refresh
       widget.onSave(updatedDefaults);
-      
+
       // Clear form fields
       _snapIdController.clear();
       _keyController.clear();
@@ -291,7 +291,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
       setState(() {
         _isMultilineExpanded = false;
       });
-      
+
     } catch (e) {
       widget.onStatusUpdate('Error saving changes: $e');
     }
@@ -331,7 +331,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                 ],
               ),
               const SizedBox(height: 8),
-              
+
               // Key and Value fields in the same row
               Row(
                 children: [
@@ -407,7 +407,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                   ),
                 ],
               ),
-              
+
               // Multiline text area (spans underneath both key and value fields with proper alignment)
               if (_isMultilineExpanded)
                 Container(
@@ -438,7 +438,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                     ),
                   ),
                 ),
-              
+
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,

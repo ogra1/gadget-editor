@@ -21,7 +21,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
   late List<Map<String, dynamic>> defaultsList;
   bool isAddingNew = false;
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form fields
   final _keyController = TextEditingController();
   final _valueController = TextEditingController();
@@ -34,7 +34,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
 
   void _parseDefaults() {
     defaultsList = [];
-    
+
     if (widget.defaults is YamlMap) {
       widget.defaults.forEach((key, value) {
         defaultsList.add({
@@ -83,11 +83,11 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
   void _saveChanges() {
     // Convert back to defaults structure
     Map<String, dynamic> updatedDefaults = {};
-    
+
     for (var def in defaultsList) {
       updatedDefaults[def['key']] = def['value'];
     }
-    
+
     widget.onSave(updatedDefaults);
   }
 
@@ -99,23 +99,23 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 16),
-          
+
           // Defaults list
           Expanded(
             child: ListView.builder(
               itemCount: defaultsList.length,
               itemBuilder: (context, index) {
                 final def = defaultsList[index];
-               
+
                 // Apply exact styling pattern that matches main pane
                 Widget contentWidget;
-                
+
                 // Check if this is a complex structure that contains multiline content
                 if (def['value'] is YamlMap) {
                   // Check for nested multiline content (like the LXD preseed example)
                   bool hasMultilineContent = false;
                   String multilineContent = '';
-                  
+
                   // Look for nested structure that might contain multiline strings
                   def['value'].forEach((key, value) {
                     if (value is String && value.contains('\n')) {
@@ -131,7 +131,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                       });
                     }
                   });
-                  
+
                   if (hasMultilineContent) {
                     // Apply same card styling as main pane for multiline content
                     contentWidget = Container(
@@ -184,7 +184,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                 } else {
                   contentWidget = Text('Value: ${def['value'] ?? 'N/A'}');
                 }
-                
+
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   child: Padding(
@@ -215,9 +215,9 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
               },
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Add new default button
           if (!isAddingNew)
             IconButton(
@@ -229,7 +229,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
-          
+
           if (isAddingNew) ...[
             const SizedBox(height: 16),
             Form(
@@ -279,9 +279,9 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
               ),
             ),
           ],
-          
+
           const SizedBox(height: 16),
-          
+
           // Save and Cancel buttons (only shown when not adding new)
           if (!isAddingNew)
             Row(

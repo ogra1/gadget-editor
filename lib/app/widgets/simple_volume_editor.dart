@@ -22,7 +22,7 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
   late List<Map<String, dynamic>> volumesList;
   bool isAddingNew = false;
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form fields
   final _nameController = TextEditingController();
   final _sizeController = TextEditingController();
@@ -46,7 +46,7 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
           'name': volumeName,
           'data': volumeData,
         });
-        
+
         if (volumeData['structure'] is List) {
           for (var item in volumeData['structure']) {
             partitions.add({
@@ -110,7 +110,7 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
   void _saveChanges() {
     // Convert back to volumes structure
     Map<String, dynamic> updatedVolumes = {};
-    
+
     for (var partition in partitions) {
       final volumeName = partition['volume'];
       if (!updatedVolumes.containsKey(volumeName)) {
@@ -118,7 +118,7 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
           'structure': [],
         };
       }
-      
+
       updatedVolumes[volumeName]['structure'].add({
         'name': partition['name'],
         'size': partition['size'],
@@ -127,7 +127,7 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
         'filesystem': partition['filesystem'],
       });
     }
-    
+
     widget.onSave(updatedVolumes);
   }
 
@@ -140,7 +140,7 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
         children: [
           // Removed the caption entirely - only one caption should exist
           const SizedBox(height: 16),
-          
+
           // Partition list
           Expanded(
             child: ListView.builder(
@@ -179,9 +179,9 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
               },
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Add new partition button
           if (!isAddingNew)
             IconButton(
@@ -193,7 +193,7 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
-          
+
           if (isAddingNew) ...[
             const SizedBox(height: 16),
             Form(
@@ -254,9 +254,9 @@ class _SimpleVolumeEditorState extends State<SimpleVolumeEditor> {
               ),
             ),
           ],
-          
+
           const SizedBox(height: 16),
-          
+
           // Save and Cancel buttons (only shown when not adding new)
           if (!isAddingNew)
             Row(

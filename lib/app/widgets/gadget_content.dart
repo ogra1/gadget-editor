@@ -57,11 +57,11 @@ class _GadgetContentState extends State<GadgetContent> {
       });
       return;
     }
-    
+
     try {
       // Parse the YAML content
       final yaml = loadYaml(widget.content!);
-      
+
       // Convert YamlMap to Map<String, dynamic> properly
       Map<String, dynamic> yamlMap;
       if (yaml is YamlMap) {
@@ -79,7 +79,7 @@ class _GadgetContentState extends State<GadgetContent> {
       } else {
         yamlMap = {};
       }
-      
+
       setState(() {
         _yamlData = yamlMap;
         _error = '';
@@ -238,7 +238,7 @@ class _GadgetContentState extends State<GadgetContent> {
       final keys = data.keys.toList();
       if (index < keys.length) {
         final keyToDelete = keys[index];
-        
+
         // Use yaml_edit to properly remove the key from YAML structure
         if (widget.filePath != null) {
           // Inline the yaml_edit logic directly in _deleteDefault
@@ -246,18 +246,18 @@ class _GadgetContentState extends State<GadgetContent> {
             // Read the existing file content
             final file = File(widget.filePath!);
             final content = file.readAsStringSync();
-            
+
             // Parse the existing YAML
             final yaml = loadYaml(content);
-            
+
             // Create a YamlEditor instance to properly handle the YAML structure
             final yamlEditor = YamlEditor(content);
-            
+
             // Remove the key from defaults section using yaml_edit's remove function
             if (yaml.containsKey('defaults') && yaml['defaults'] is YamlMap) {
               // Use yaml_edit's remove function to delete the specific key
               yamlEditor.remove(['defaults', keyToDelete]);
-              
+
               // Check if the defaults section is now empty and remove it entirely if so
               final path = ['defaults'];
               final defaultsSection = yamlEditor.parseAt(path);
@@ -276,7 +276,7 @@ class _GadgetContentState extends State<GadgetContent> {
             } else if (yaml.containsKey('defaults') && yaml['defaults'] is Map) {
               // Handle Map case
               yamlEditor.remove(['defaults', keyToDelete]);
-              
+
               // Check if the defaults section is now empty and remove it entirely if so
               final defaultsSection = yaml['defaults'];
               if (defaultsSection is Map) {
@@ -286,19 +286,19 @@ class _GadgetContentState extends State<GadgetContent> {
                 }
               }
             }
-            
+
             // Write back to file using yaml_editor's toString() method
             final newYamlString = yamlEditor.toString();
-            
+
             // Write back to file
             file.writeAsStringSync(newYamlString);
-            
+
             // Show success message via status bar
             widget.onStatusUpdate('Default deleted successfully');
-            
+
             // Refresh content to reflect changes
             _refreshContentFromFile();
-            
+
           } catch (e) {
             widget.onStatusUpdate('Error deleting default: $e');
           }
@@ -317,10 +317,10 @@ class _GadgetContentState extends State<GadgetContent> {
               _yamlData['defaults'] = newYamlMap;
             }
           });
-          
+
           // Show success message via status bar
           widget.onStatusUpdate('Default deleted successfully');
-          
+
           // Refresh content to reflect changes
           _refreshContentFromFile();
         }
@@ -330,7 +330,7 @@ class _GadgetContentState extends State<GadgetContent> {
       final keys = data.keys.toList();
       if (index < keys.length) {
         final keyToDelete = keys[index];
-        
+
         setState(() {
           if (_yamlData.containsKey('defaults') && _yamlData['defaults'] is Map) {
             final defaultsMap = _yamlData['defaults'] as Map<String, dynamic>;
@@ -339,15 +339,15 @@ class _GadgetContentState extends State<GadgetContent> {
             _yamlData['defaults'] = mutableDefaults;
           }
         });
-        
+
         // Show success message via status bar
         widget.onStatusUpdate('Default deleted successfully');
-        
+
         // Save changes to file if filePath is provided
         if (widget.filePath != null) {
           _saveChangesToFile();
         }
-        
+
         // Refresh content to reflect changes
         _refreshContentFromFile();
       }
@@ -364,18 +364,18 @@ class _GadgetContentState extends State<GadgetContent> {
         // Read the existing file content
         final file = File(widget.filePath!);
         final content = file.readAsStringSync();
-        
+
         // Parse the existing YAML
         final yaml = loadYaml(content);
-        
+
         // Create a YamlEditor instance to properly handle the YAML structure
         final yamlEditor = YamlEditor(content);
-        
+
         // Remove the connection at the specified index
         if (yaml.containsKey('connections') && yaml['connections'] is List) {
           // Use yaml_edit's remove function to delete the specific connection
           yamlEditor.remove(['connections', index]);
-          
+
           // Check if the connections section is now empty and remove it entirely if so
           final connectionsSection = yamlEditor.parseAt(['connections']).value;
           if (connectionsSection is List && connectionsSection.isEmpty) {
@@ -383,19 +383,19 @@ class _GadgetContentState extends State<GadgetContent> {
             yamlEditor.remove(['connections']);
           }
         }
-        
+
         // Write back to file using yaml_editor's toString() method
         final newYamlString = yamlEditor.toString();
-        
+
         // Write back to file
         file.writeAsStringSync(newYamlString);
-        
+
         // Show success message via status bar
         widget.onStatusUpdate('Connection deleted successfully');
-        
+
         // Refresh content to reflect changes
         _refreshContentFromFile();
-        
+
       } catch (e) {
         widget.onStatusUpdate('Error deleting connection: $e');
       }
@@ -410,15 +410,15 @@ class _GadgetContentState extends State<GadgetContent> {
           }
         }
       });
-      
+
       // Show success message via status bar
       widget.onStatusUpdate('Connection deleted successfully');
-      
+
       // Save changes to file if filePath is provided
       if (widget.filePath != null) {
         _saveChangesToFile();
       }
-      
+
       // Refresh content to reflect changes
       _refreshContentFromFile();
     }
@@ -431,21 +431,21 @@ class _GadgetContentState extends State<GadgetContent> {
         // Read the existing file content
         final file = File(widget.filePath!);
         final content = file.readAsStringSync();
-        
+
         // Parse the existing YAML
         final yaml = loadYaml(content);
-        
+
         // Create a YamlEditor instance to properly handle the YAML structure
         final yamlEditor = YamlEditor(content);
-        
+
         // Remove the kernel cmdline parameter at the specified index
         if (yaml.containsKey('kernel-cmdline') && yaml['kernel-cmdline'] is YamlMap) {
           final kernelCmdlineMap = yaml['kernel-cmdline'] as YamlMap;
-          
+
           // Find which section (allow, append, remove) contains the item to delete
           String? sectionToDeleteFrom;
           int? itemIndexInSection;
-          
+
           // Check allow section
           if (kernelCmdlineMap.containsKey('allow') && kernelCmdlineMap['allow'] is List) {
             final allowList = kernelCmdlineMap['allow'] as List;
@@ -454,7 +454,7 @@ class _GadgetContentState extends State<GadgetContent> {
               itemIndexInSection = index;
             }
           }
-          
+
           // Check append section
           if (sectionToDeleteFrom == null && 
               kernelCmdlineMap.containsKey('append') && 
@@ -465,7 +465,7 @@ class _GadgetContentState extends State<GadgetContent> {
               itemIndexInSection = index;
             }
           }
-          
+
           // Check remove section
           if (sectionToDeleteFrom == null && 
               kernelCmdlineMap.containsKey('remove') && 
@@ -476,18 +476,18 @@ class _GadgetContentState extends State<GadgetContent> {
               itemIndexInSection = index;
             }
           }
-          
+
           // If we found the section to delete from, remove the item
           if (sectionToDeleteFrom != null && itemIndexInSection != null) {
             yamlEditor.remove(['kernel-cmdline', sectionToDeleteFrom, itemIndexInSection]);
-            
+
             // Check if the section is now empty and remove it entirely if so
             final section = yamlEditor.parseAt(['kernel-cmdline', sectionToDeleteFrom]).value;
             if (section is List && section.isEmpty) {
               // Remove the entire section if it's now empty
               yamlEditor.remove(['kernel-cmdline', sectionToDeleteFrom]);
             }
-            
+
             // Check if kernel-cmdline section is now empty and remove it entirely if so
             final kernelCmdlineSection = yamlEditor.parseAt(['kernel-cmdline']).value;
             if (kernelCmdlineSection is YamlMap) {
@@ -507,19 +507,19 @@ class _GadgetContentState extends State<GadgetContent> {
             }
           }
         }
-        
+
         // Write back to file using yaml_editor's toString() method
         final newYamlString = yamlEditor.toString();
-        
+
         // Write back to file
         file.writeAsStringSync(newYamlString);
-        
+
         // Show success message via status bar
         widget.onStatusUpdate('Kernel parameter deleted successfully');
-        
+
         // Refresh content to reflect changes
         _refreshContentFromFile();
-        
+
       } catch (e) {
         widget.onStatusUpdate('Error deleting kernel parameter: $e');
       }
@@ -533,19 +533,19 @@ class _GadgetContentState extends State<GadgetContent> {
           for (var key in kernelCmdlineMap.keys) {
             mutableKernelCmdline[key.toString()] = kernelCmdlineMap[key];
           }
-          
+
           // Check if allow exists and is a list
           if (mutableKernelCmdline.containsKey('allow') && mutableKernelCmdline['allow'] is List) {
             final allowList = List.from(mutableKernelCmdline['allow']);
             if (index < allowList.length) {
               allowList.removeAt(index);
               mutableKernelCmdline['allow'] = allowList;
-              
+
               // Remove the allow section if it's now empty
               if (allowList.isEmpty) {
                 mutableKernelCmdline.remove('allow');
               }
-              
+
               _yamlData['kernel-cmdline'] = mutableKernelCmdline;
             }
           }
@@ -555,12 +555,12 @@ class _GadgetContentState extends State<GadgetContent> {
             if (index < appendList.length) {
               appendList.removeAt(index);
               mutableKernelCmdline['append'] = appendList;
-              
+
               // Remove the append section if it's now empty
               if (appendList.isEmpty) {
                 mutableKernelCmdline.remove('append');
               }
-              
+
               _yamlData['kernel-cmdline'] = mutableKernelCmdline;
             }
           }
@@ -570,25 +570,25 @@ class _GadgetContentState extends State<GadgetContent> {
             if (index < removeList.length) {
               removeList.removeAt(index);
               mutableKernelCmdline['remove'] = removeList;
-              
+
               // Remove the remove section if it's now empty
               if (removeList.isEmpty) {
                 mutableKernelCmdline.remove('remove');
               }
-              
+
               _yamlData['kernel-cmdline'] = mutableKernelCmdline;
             }
           }
         }
       });
-      
+
       widget.onStatusUpdate('Kernel parameter deleted');
-      
+
       // Save changes to file if filePath is provided
       if (widget.filePath != null) {
         _saveChangesToFile();
       }
-      
+
       // Refresh content to reflect changes - this was missing
       _refreshContentFromFile();
     }
@@ -597,16 +597,16 @@ class _GadgetContentState extends State<GadgetContent> {
   // Save the current YAML data back to the file with proper formatting
   Future<void> _saveChangesToFile() async {
     if (widget.filePath == null) return;
-    
+
     try {
       final file = File(widget.filePath!);
-      
+
       // Clean up empty sections
       _cleanupEmptySections();
-      
+
       // Convert the _yamlData back to YAML string using the YAML serializer
       final yamlString = YamlSerializer.serialize(_yamlData);
-      
+
       // Write back to file
       await file.writeAsString(yamlString);
     } catch (e) {
@@ -625,7 +625,7 @@ class _GadgetContentState extends State<GadgetContent> {
         _yamlData.remove('defaults');
       }
     }
-    
+
     // Remove empty connections section
     if (_yamlData.containsKey('connections')) {
       final connections = _yamlData['connections'];
@@ -635,7 +635,7 @@ class _GadgetContentState extends State<GadgetContent> {
         _yamlData.remove('connections');
       }
     }
-    
+
     // Remove empty kernel-cmdline section
     if (_yamlData.containsKey('kernel-cmdline')) {
       final kernelCmdline = _yamlData['kernel-cmdline'];
@@ -647,7 +647,7 @@ class _GadgetContentState extends State<GadgetContent> {
         // Check if all sub-sections are empty
         final kernelCmdlineMap = kernelCmdline is YamlMap ? kernelCmdline.cast<String, dynamic>() : kernelCmdline as Map<String, dynamic>;
         bool allEmpty = true;
-        
+
         // Check if all sections (allow, append, remove) are empty
         for (var key in ['allow', 'append', 'remove']) {
           if (kernelCmdlineMap.containsKey(key) && 
@@ -657,7 +657,7 @@ class _GadgetContentState extends State<GadgetContent> {
             break;
           }
         }
-        
+
         // If all sections are empty, remove the entire kernel-cmdline section
         if (allEmpty) {
           _yamlData.remove('kernel-cmdline');
@@ -670,13 +670,13 @@ class _GadgetContentState extends State<GadgetContent> {
   String _manualSerializeYaml(Map<String, dynamic> data, {int indent = 0}) {
     final StringBuffer buffer = StringBuffer();
     final indentStr = '  ' * indent;
-    
+
     // Sort keys to ensure consistent output
     final sortedKeys = data.keys.toList()..sort();
-    
+
     for (var key in sortedKeys) {
       final value = data[key];
-      
+
       if (value is Map<String, dynamic>) {
         buffer.write('$indentStr$key:\n');
         buffer.write(_manualSerializeYaml(value, indent: indent + 1));
@@ -701,7 +701,7 @@ class _GadgetContentState extends State<GadgetContent> {
         buffer.write('$indentStr$key: $value\n');
       }
     }
-    
+
     return buffer.toString();
   }
 
@@ -775,10 +775,10 @@ class _GadgetContentState extends State<GadgetContent> {
           child: const Text('Editor for this section is not implemented yet.'),
         );
     }
-    
+
     // Make dialogs fit content size with 50% width instead of 80%
     double dialogWidth = MediaQuery.of(context).size.width * 0.5;
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {

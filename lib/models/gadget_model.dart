@@ -3,7 +3,7 @@ class GadgetModel {
   final String? gadgetContent;
   final Map<String, dynamic>? gadgetData;
   final List<Map<String, dynamic>> availableChannels;
-  
+
   GadgetModel({
     this.snapName,
     this.gadgetContent,

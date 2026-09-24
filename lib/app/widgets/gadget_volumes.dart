@@ -45,7 +45,7 @@ class GadgetVolumesSection extends StatelessWidget {
         ),
       );
     }
-    
+
     if (volumes is YamlMap) {
       return Container(
         decoration: BoxDecoration(
@@ -108,7 +108,7 @@ class GadgetVolumesSection extends StatelessWidget {
         ),
       );
     }
-    
+
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).dividerColor),
@@ -131,24 +131,24 @@ class GadgetVolumesSection extends StatelessWidget {
       ),
     );
   }
-  
+
   // Function to update volume name in the YAML file
   void _updateVolumeNameInFile(String filePath, String oldName, String newName) {
     try {
       // Read the existing file content
       final file = File(filePath);
       final content = file.readAsStringSync();
-      
+
       // Parse the YAML content
       final yaml = loadYaml(content);
-      
+
       // Check if it's a YamlMap and has volumes
       if (yaml is YamlMap && yaml.containsKey('volumes')) {
         final volumes = yaml['volumes'];
-        
+
         // Create a new volumes map with updated volume name
         final newVolumes = <String, dynamic>{};
-        
+
         // Iterate through existing volumes and update the name
         if (volumes is YamlMap) {
           for (var entry in volumes.entries) {
@@ -167,23 +167,23 @@ class GadgetVolumesSection extends StatelessWidget {
             }
           }
         }
-        
+
         // Create a new YamlEditor instance to update the file
         final editor = YamlEditor(content);
-        
+
         // Update the volumes section in the editor
         editor.update(['volumes'], newVolumes);
-        
+
         // Write back to file
         file.writeAsStringSync(editor.toString());
       }
-      
+
     } catch (e) {
       // Handle error appropriately in your app
       print('Error updating volume name: $e');
     }
   }
-  
+
   Widget _buildPartitionVisualization(BuildContext context, List structure) {
     if (structure.isEmpty) {
       return Container(
@@ -275,7 +275,7 @@ class GadgetVolumesSection extends StatelessWidget {
       ),
     );
   }
-  
+
   double _parseSize(dynamic size) {
     if (size == null) return 0;
 
@@ -293,7 +293,7 @@ class GadgetVolumesSection extends StatelessWidget {
       return double.tryParse(sizeStr) ?? 0;
     }
   }
-  
+
   String _formatSize(double sizeInBytes) {
     if (sizeInBytes >= 1024 * 1024 * 1024) {
       return '${(sizeInBytes / (1024 * 1024 * 1024)).toStringAsFixed(1)}G';
@@ -305,7 +305,7 @@ class GadgetVolumesSection extends StatelessWidget {
       return '${sizeInBytes.toStringAsFixed(0)}B';
     }
   }
-  
+
   Color _getPartitionColor(String? role, double sizeInBytes) {
     // Define pastel colors for each role
     Map<String, Color> roleColors = {
@@ -328,7 +328,7 @@ class GadgetVolumesSection extends StatelessWidget {
     // For partitions without roles, use a size-based color gradient
     return _getSizeBasedColor(sizeInBytes);
   }
-  
+
   double _calculateIntensity(double sizeInBytes) {
     // Define reasonable size ranges to map to intensity
     const double smallThreshold = 1024 * 1024; // 1MB
@@ -342,7 +342,7 @@ class GadgetVolumesSection extends StatelessWidget {
       return 0.4; // Darker color for large partitions
     }
   }
-  
+
   Color _adjustColorBrightness(Color color, double intensity) {
     // Create a simple brightness adjustment by modifying RGB values directly
     int red = (color.red * intensity).round().clamp(0, 255);
@@ -351,7 +351,7 @@ class GadgetVolumesSection extends StatelessWidget {
 
     return Color.fromARGB(color.alpha, red, green, blue);
   }
-  
+
   Color _getSizeBasedColor(double sizeInBytes) {
     // Create a color gradient based on size using simple thresholds
     const double smallThreshold = 1024 * 1024; // 1MB
