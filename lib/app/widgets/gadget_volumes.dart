@@ -95,7 +95,7 @@ class GadgetVolumesSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     if (volumeData['structure'] != null && volumeData['structure'] is List) 
-                      _buildPartitionVisualization(context, volumeData['structure'], volumeName)
+                      _buildPartitionVisualization(context, volumeData['structure'], volumeName) 
                     else if (volumeData['structure'] == null) 
                       const Text('No structure field found') 
                     else 
@@ -278,16 +278,18 @@ class GadgetVolumesSection extends StatelessWidget {
                                       return PartitionSizeEditor(
                                         partitionName: item['name'] ?? 'Unnamed',
                                         currentSize: _formatSize(item['size']),
+                                        filePath: filePath,
+                                        volumeName: volumeName,
                                         onSave: (newSize) {
-                                          // Close the dialog
+                                          // The dialog handles saving, so we just close it
                                           Navigator.of(context).pop();
-                                          // Update the size in the YAML file
-                                          if (filePath != null) {
-                                            _updatePartitionSizeInFile(filePath!, volumeName, item['name'], newSize);
-                                          }
                                         },
                                         onCancel: () {
                                           Navigator.of(context).pop();
+                                        },
+                                        onStatusUpdate: (message) {
+                                          // Handle status updates if needed
+                                          // This could update a status bar in the parent
                                         },
                                       );
                                     },
@@ -410,55 +412,6 @@ class GadgetVolumesSection extends StatelessWidget {
     } else {
       // Large partitions - dark blue (but still pastel-like)
       return const Color(0xFF1976D2); // Darker blue
-    }
-  }
-
-  // Function to update partition size in the YAML file
-  void _updatePartitionSizeInFile(String filePath, String volumeName, String partitionName, String newSize) {
-    try {
-      // Read the existing file content
-      final file = File(filePath);
-      final content = file.readAsStringSync();
-
-      // Parse the YAML content
-      final yaml = loadYaml(content);
-
-      // Check if it's a YamlMap and has volumes
-      if (yaml is YamlMap && yaml.containsKey('volumes')) {
-        final volumes = yaml['volumes'];
-
-        // Find the specific volume and update its structure
-        if (volumes is YamlMap) {
-          for (var entry in volumes.entries) {
-            if (entry.key == volumeName) {
-              final volumeData = entry.value;
-
-              // Check if the structure exists and is a list
-              if (volumeData['structure'] is List) {
-                final structure = volumeData['structure'];
-
-                // Find and update the specific partition with matching name
-                for (var i = 0; i < structure.length; i++) {
-                  if (structure[i]['name'] == partitionName) {
-                    structure[i]['size'] = newSize;
-                    break;
-                  }
-                }
-
-                // Update the structure in the editor
-                final editor = YamlEditor(content);
-                editor.update(['volumes', volumeName, 'structure'], structure);
-                file.writeAsStringSync(editor.toString());
-                break;
-              }
-            }
-          }
-        }
-      }
-
-    } catch (e) {
-      // Handle error appropriately in your app
-      print('Error updating partition size: $e');
     }
   }
 }
