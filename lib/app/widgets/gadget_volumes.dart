@@ -7,11 +7,12 @@ import 'package:file_selector/file_selector.dart';
 import 'dart:io'; // Add this import for File
 import 'package:gadget_editor/app/widgets/partition_size_editor.dart'; // Import the new editor
 
-class GadgetVolumesSection extends StatelessWidget {
+class GadgetVolumesSection extends StatefulWidget {
   final dynamic volumes;
   final VoidCallback? onEdit;
   final bool showEditButton;
   final String? filePath; // Add file path parameter
+  final VoidCallback? refreshCallback;
 
   const GadgetVolumesSection({
     super.key,
@@ -19,11 +20,17 @@ class GadgetVolumesSection extends StatelessWidget {
     this.onEdit,
     this.showEditButton = true,
     this.filePath, // Add file path parameter
+    this.refreshCallback,
   });
 
   @override
+  State<GadgetVolumesSection> createState() => _GadgetVolumesSectionState();
+}
+
+class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
+  @override
   Widget build(BuildContext context) {
-    if (volumes == null || (volumes is YamlMap && volumes.isEmpty)) {
+    if (widget.volumes == null || (widget.volumes is YamlMap && widget.volumes.isEmpty)) {
       return Container(
         decoration: BoxDecoration(
           border: Border.all(color: Theme.of(context).dividerColor),
@@ -47,7 +54,7 @@ class GadgetVolumesSection extends StatelessWidget {
       );
     }
 
-    if (volumes is YamlMap) {
+    if (widget.volumes is YamlMap) {
       return Container(
         decoration: BoxDecoration(
           border: Border.all(color: Theme.of(context).dividerColor),
@@ -66,7 +73,7 @@ class GadgetVolumesSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              ...volumes.entries.map((entry) {
+              ...widget.volumes.entries.map((entry) {
                 final volumeName = entry.key;
                 final volumeData = entry.value;
 
@@ -84,8 +91,8 @@ class GadgetVolumesSection extends StatelessWidget {
                             text: volumeName,
                             onSave: (newName) {
                               // Update the volume name in the YAML file
-                              if (filePath != null) {
-                                _updateVolumeNameInFile(filePath!, volumeName, newName);
+                              if (widget.filePath != null) {
+                                _updateVolumeNameInFile(widget.filePath!, volumeName, newName);
                               }
                             },
                             style: const TextStyle(fontSize: 16),
@@ -278,10 +285,13 @@ class GadgetVolumesSection extends StatelessWidget {
                                       return PartitionSizeEditor(
                                         partitionName: item['name'] ?? 'Unnamed',
                                         currentSize: _formatSize(item['size']),
-                                        filePath: filePath,
+                                        filePath: widget.filePath,
                                         volumeName: volumeName,
                                         onSave: (newSize) {
                                           // The dialog handles saving, so we just close it
+                                          if (widget.refreshCallback != null) {
+                                            widget.refreshCallback!();
+                                          }
                                           Navigator.of(context).pop();
                                         },
                                         onCancel: () {
@@ -290,6 +300,12 @@ class GadgetVolumesSection extends StatelessWidget {
                                         onStatusUpdate: (message) {
                                           // Handle status updates if needed
                                           // This could update a status bar in the parent
+                                        },
+                                        onPartitionChanged: () {
+                                          // Trigger refresh when partition is changed
+                                          if (widget.refreshCallback != null) {
+                                            widget.refreshCallback!();
+                                          }
                                         },
                                       );
                                     },

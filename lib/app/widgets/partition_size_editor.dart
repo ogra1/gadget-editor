@@ -11,6 +11,7 @@ class PartitionSizeEditor extends StatefulWidget {
   final Function(String) onSave;
   final Function() onCancel;
   final Function(String) onStatusUpdate;
+  final Function()? onPartitionChanged;
 
   const PartitionSizeEditor({
     super.key,
@@ -21,6 +22,7 @@ class PartitionSizeEditor extends StatefulWidget {
     required this.onSave,
     required this.onCancel,
     required this.onStatusUpdate,
+    this.onPartitionChanged,
   });
 
   @override
@@ -30,7 +32,7 @@ class PartitionSizeEditor extends StatefulWidget {
 class _PartitionSizeEditorState extends State<PartitionSizeEditor> {
   final _sizeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _isSaving = false; // Prevents double submission crash
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -86,7 +88,6 @@ class _PartitionSizeEditorState extends State<PartitionSizeEditor> {
               }
               
               if (targetIndex != -1) {
-                // Update the precise array index path cleanly
                 editor.update([
                   'volumes', 
                   widget.volumeName, 
@@ -97,12 +98,14 @@ class _PartitionSizeEditorState extends State<PartitionSizeEditor> {
 
                 await file.writeAsString(editor.toString());
                 
-                if (!mounted) return; // Prevent crashes if screen was manually closed
+                if (!mounted) return;
                 widget.onStatusUpdate('Partition size updated successfully to $newSize');
                 widget.onSave(newSize);
                 
-                // Safe UI close AFTER the filesystem process succeeds
-                //Navigator.of(context).pop();
+                if (widget.onPartitionChanged != null) {
+                  widget.onPartitionChanged!();
+                }
+                
                 return;
               }
             }
@@ -136,7 +139,7 @@ class _PartitionSizeEditorState extends State<PartitionSizeEditor> {
             children: [
               TextFormField(
                 controller: _sizeController,
-                enabled: !_isSaving, // Disable text input during save actions
+                enabled: !_isSaving,
                 decoration: const InputDecoration(
                   labelText: 'Size',
                   hintText: 'e.g., 100M, 1G, 440, 1.5G',
@@ -165,7 +168,7 @@ class _PartitionSizeEditorState extends State<PartitionSizeEditor> {
               ? null
               : () {
                   if (_formKey.currentState!.validate()) {
-                    _saveChangesToYaml(); // No synchronous closing here!
+                    _saveChangesToYaml();
                   }
                 },
           child: _isSaving 
@@ -176,4 +179,3 @@ class _PartitionSizeEditorState extends State<PartitionSizeEditor> {
     );
   }
 }
-

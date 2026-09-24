@@ -161,14 +161,8 @@ class _GadgetContentState extends State<GadgetContent> {
           // Volumes Section
           GadgetVolumesSection(
             volumes: volumes,
-            onEdit: () {
-              _showEditorDialog(context, 'Volumes', volumes, (data) {
-                // In a real implementation, this would save the data
-                // We'll show a status message for consistency
-                widget.onStatusUpdate('Volumes would be saved in a real implementation');
-              });
-            },
             filePath: widget.filePath,
+            refreshCallback: _refreshContentFromFile,
           ),
           const SizedBox(height: 16),
 
