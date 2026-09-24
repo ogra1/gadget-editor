@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:yaml/yaml.dart';
 import 'package:path/path.dart' as path;
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter_window_close/flutter_window_close.dart';
 import '../models/gadget_model.dart';
 import '../services/snap_service.dart';
 import '../services/file_service.dart';
@@ -14,6 +15,23 @@ import 'widgets/search_section.dart';
 import 'widgets/local_snap_loader.dart';
 import 'widgets/gadget_content.dart';
 import 'widgets/empty_state.dart';
+import 'widgets/editable_text_field.dart'; // Import the new widget';
+import 'package:yaml_edit/yaml_edit.dart'; // Import yaml_edit package
+
+// Global variable to store the temp directory path
+Directory? globalTempDirectory;
+
+void _cleanUpAndExit() {
+  if (globalTempDirectory != null && globalTempDirectory!.existsSync()) {
+    try {
+      // Synchronously erase the custom folder and its contents
+      globalTempDirectory!.deleteSync(recursive: true);
+    } catch (e) {
+      stderr.writeln('Failed to purge temporary directory: $e');
+    }
+  }
+  exit(0);
+}
 
 class GadgetEditorScreen extends StatefulWidget {
   const GadgetEditorScreen({super.key});
@@ -42,12 +60,37 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   String? loadedLocalSnapPath;
   // Store platform information
   bool isAmd64Platform = true; // Default to amd64
+  // Store the file path for saving changes
+  String? gadgetFilePath;
+  // Store the snap.yaml file path for saving snap name
+  String? snapFilePath;
+  
+  // Editing state for snap name
+  bool _isEditingSnapName = false;
+  final TextEditingController _snapNameController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     // Create a temporary directory for our snap files
     _createTempDirectory();
+    
+    // Register native signal intercepts for Linux termination events
+    ProcessSignal.sigint.watch().listen((_) => _cleanUpAndExit());
+    ProcessSignal.sigterm.watch().listen((_) => _cleanUpAndExit());
+    
+    // Register window close handler for GTK events
+    FlutterWindowClose.setWindowShouldCloseHandler(() async {
+      _cleanUpAndExit();
+      return true;
+    });
+  }
+
+  @override
+  void dispose() {
+    // Clean up temporary files when the widget is disposed
+    _cleanupTempFiles();
+    super.dispose();
   }
 
   Future<void> _createTempDirectory() async {
@@ -56,21 +99,55 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       final tempDir = Directory.systemTemp;
       final appDir = Directory('${tempDir.path}/gadget_editor_${DateTime.now().millisecondsSinceEpoch}');
       await appDir.create(recursive: true);
+      globalTempDirectory = appDir;
       appTempDirectory = appDir.path;
       tempDirectoryPath = appDir.path;
+      print('created tempdir: $appDir.path'); 
     } catch (e) {
-      // Fallback to current directory if temp creation fails
-      tempDirectoryPath = null;
+      // If temp directory creation fails, we still want to track that we tried
+      // But we won't set tempDirectoryPath to null to avoid cleanup issues
+      // Instead, we'll just not set the temp directory path
       appTempDirectory = null;
+      tempDirectoryPath = null;
+      globalTempDirectory = null;
     }
   }
 
   Future<void> _cleanupTempFiles() async {
     try {
-      if (appTempDirectory != null) {
-        final tempDir = Directory(appTempDirectory!);
-        if (await tempDir.exists()) {
-          await tempDir.delete(recursive: true);
+      // Check if we have a valid temp directory path
+      Directory? tempDir;
+      
+      // Use the global temp directory if available
+      if (globalTempDirectory != null) {
+        tempDir = globalTempDirectory;
+      } else if (appTempDirectory != null) {
+        // Explicitly check for null to avoid the promotion issue
+        tempDir = Directory(appTempDirectory!);
+      } else if (tempDirectoryPath != null) {
+        // Explicitly check for null to avoid the promotion issue
+        tempDir = Directory(tempDirectoryPath!);
+      }
+      
+      print('in cleanup function: $tempDir'); 
+      
+      // If we have a path, try to delete it
+      if (tempDir != null && await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+      
+      // Also try to clean up any old gadget_editor directories that might exist
+      // This is a fallback cleanup for any leftover directories
+      final tempDirPath = Directory.systemTemp;
+      final entries = await tempDirPath.list().toList();
+      
+      for (var entry in entries) {
+        if (entry is Directory && entry.path.contains('/gadget_editor_')) {
+          try {
+            await entry.delete(recursive: true);
+          } catch (e) {
+            // Ignore cleanup errors as they're not critical
+          }
         }
       }
     } catch (e) {
@@ -227,7 +304,14 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         throw Exception('gadget.yaml not found in snap');
       }
         
-      // Read and parse
+      // Find snap.yaml
+      final snapPath = '$extractPath/meta/snap.yaml';
+      final snapFileForReading = File(snapPath);
+      if (!await snapFileForReading.exists()) {
+        throw Exception('snap.yaml not found in snap');
+      }
+        
+      // Read and parse gadget.yaml
       final content = await gadgetFile.readAsString();
       final data = loadYaml(content); // This returns YamlMap, not Map<String, dynamic>
         
@@ -241,7 +325,15 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         throw Exception('Unsupported YAML data type: ${data.runtimeType}');
       }
         
-      // Extract snap name from filename (everything before first underscore)
+      // Read snap.yaml to get the actual snap name
+      final snapContent = await snapFileForReading.readAsString();
+      final snapData = loadYaml(snapContent);
+      String snapNameFromSnapYaml = '';
+      if (snapData is YamlMap && snapData.containsKey('name')) {
+        snapNameFromSnapYaml = snapData['name'] as String;
+      }
+        
+      // Extract snap name from filename (everything before first underscore) if snap.yaml doesn't have it
       String snapNameFromFileName = fileName;
       final underscoreIndex = fileName.indexOf('_');
       if (underscoreIndex != -1) {
@@ -249,11 +341,14 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       }
         
       setState(() {
-        this.snapName = snapNameFromFileName;
+        // Only set snapName from the actual snap.yaml file content
+        this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapNameFromFileName;
         this.gadgetContent = content;
         this.gadgetData = parsedData;
         this.isAmd64Platform = false; // Local snaps are typically not amd64
         loadedLocalSnapPath = filePath; // Store the original path
+        gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
+        snapFilePath = snapPath; // Store the snap.yaml file path
         availableChannels = []; // Clear remote channels
         statusMessage = 'Local gadget snap loaded successfully';
       });
@@ -288,7 +383,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       }
         
       // Determine the file path - use temp directory if available, otherwise current directory
-      final fileName = '$snapName.snap';
+      final fileName = path.basename(channel['download']['url']);
       String filePath;
       if (tempDirectoryPath != null) {
         filePath = '$tempDirectoryPath/$fileName';
@@ -323,17 +418,32 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
               throw Exception('Unsupported YAML data type: ${data.runtimeType}');
             }
               
+            // Extract snap name from snap.yaml if available
+            final snapPath = '$uniqueExtractPath/meta/snap.yaml';
+            final snapFileForReading = File(snapPath);
+            String snapNameFromSnapYaml = '';
+            if (await snapFileForReading.exists()) {
+              final snapContent = await snapFileForReading.readAsString();
+              final snapData = loadYaml(snapContent);
+              if (snapData is YamlMap && snapData.containsKey('name')) {
+                snapNameFromSnapYaml = snapData['name'] as String;
+              }
+            }
+              
             // Extract architecture information from the channel
             final architecture = channelInfo['architecture'] as String?;
             // Determine if it's amd64 platform
             bool isAmd64 = architecture?.toLowerCase() == 'amd64';
               
             setState(() {
-              this.snapName = snapName;
+              // Only set snapName from the actual snap.yaml file content
+              this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapName;
               this.gadgetContent = content;
               this.gadgetData = parsedData;
               this.selectedChannel = channel;
               this.isAmd64Platform = isAmd64; // Store the platform info
+              this.gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
+              this.snapFilePath = snapPath; // Store the snap.yaml file path
             });
               
             setState(() {
@@ -359,14 +469,15 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         final snapFile = File(filePath);
         await snapFile.openWrite().addStream(downloadResponse);
           
-        // Extract snap using Process - make directory name unique with track/risk
+        // Extract snap using Process - make directory name based on filename
         final channelInfo = channel['channel'] as Map<String, dynamic>;
         final track = channelInfo['track'] as String?;
         final risk = channelInfo['risk'] as String?;
         String uniqueExtractPath;
           
         if (track != null && risk != null) {
-          // Create unique directory name with track and risk
+          // Create unique directory name based on filename and track/risk
+          final baseFileName = path.basename(filePath);
           uniqueExtractPath = '${filePath}_extracted_${track}_${risk}';
         } else {
           // Fallback to original naming
@@ -410,17 +521,35 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
           throw Exception('Unsupported YAML data type: ${data.runtimeType}');
         }
           
+        // Find snap.yaml
+        final snapPath = '$uniqueExtractPath/meta/snap.yaml';
+        final snapFileForReading = File(snapPath);
+        if (!await snapFileForReading.exists()) {
+          throw Exception('snap.yaml not found in snap');
+        }
+        
+        // Read snap.yaml to get the actual snap name
+        final snapContent = await snapFileForReading.readAsString();
+        final snapData = loadYaml(snapContent);
+        String snapNameFromSnapYaml = '';
+        if (snapData is YamlMap && snapData.containsKey('name')) {
+          snapNameFromSnapYaml = snapData['name'] as String;
+        }
+          
         // Extract architecture information from the channel
         final architecture = channelInfo['architecture'] as String?;
         // Determine if it's amd64 platform
         bool isAmd64 = architecture?.toLowerCase() == 'amd64';
           
         setState(() {
-          this.snapName = snapName;
+          // Only set snapName from the actual snap.yaml file content
+          this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapName;
           this.gadgetContent = content;
           this.gadgetData = parsedData;
           this.selectedChannel = channel;
           this.isAmd64Platform = isAmd64; // Store the platform info
+          this.gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
+          this.snapFilePath = snapPath; // Store the snap.yaml file path
         });
           
         setState(() {
@@ -475,8 +604,21 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
               throw Exception('Unsupported YAML data type: ${data.runtimeType}');
             }
               
+            // Read snap.yaml to get the actual snap name
+            final snapPath = '$extractPath/meta/snap.yaml';
+            final snapFileForReading = File(snapPath);
+            String snapNameFromSnapYaml = '';
+            if (await snapFileForReading.exists()) {
+              final snapContent = await snapFileForReading.readAsString();
+              final snapData = loadYaml(snapContent);
+              if (snapData is YamlMap && snapData.containsKey('name')) {
+                snapNameFromSnapYaml = snapData['name'] as String;
+              }
+            }
+              
             setState(() {
-              this.snapName = 'Local Snap: ${path.basename(loadedLocalSnapPath!)}';
+              // Only set snapName from the actual snap.yaml file content
+              this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : 'Local Snap';
               this.gadgetContent = content;
               this.gadgetData = parsedData;
             });
@@ -502,6 +644,60 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
           isLoading = false;
         });
       }
+    }
+  }
+
+  // Function to save the edited snap name to the file
+  Future<void> _saveSnapNameToFile(String newName) async {
+    if (snapFilePath == null) {
+      setState(() {
+        statusMessage = 'Error: No snap.yaml file path available';
+      });
+      return;
+    }
+
+    try {
+      // Read the existing snap.yaml content
+      final file = File(snapFilePath!);
+      final content = await file.readAsString();
+      
+      // Parse the existing YAML
+      final yaml = loadYaml(content);
+      
+      // Convert YamlMap to Map<String, dynamic> properly to avoid type errors
+      Map<String, dynamic> yamlMap;
+      if (yaml is YamlMap) {
+        // Properly convert YamlMap to Map<String, dynamic>
+        yamlMap = {};
+        for (var key in yaml.keys) {
+          yamlMap[key.toString()] = yaml[key];
+        }
+      } else if (yaml is Map<String, dynamic>) {
+        yamlMap = yaml;
+      } else {
+        yamlMap = {};
+      }
+      
+      // Update the snap name in the YAML structure
+      yamlMap['name'] = newName;
+      
+      // Use yaml_edit to serialize without adding unnecessary quotes
+      final yamlEditor = YamlEditor(content);
+      yamlEditor.update(['name'], newName);
+      final newYamlString = yamlEditor.toString();
+      
+      // Write back to file
+      await file.writeAsString(newYamlString);
+      
+      setState(() {
+        snapName = newName;
+        statusMessage = 'Snap name saved successfully';
+      });
+      
+    } catch (e) {
+      setState(() {
+        statusMessage = 'Error saving snap name: $e';
+      });
     }
   }
 
@@ -542,7 +738,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                         controller: _searchController,
                         onSubmitted: (value) {
                           if (value.isNotEmpty) {
-                            snapName = value;
+                            // Only set snapName from the actual snap.yaml content when downloading
                             fetchSnapChannels(value);
                           }
                         },
@@ -673,9 +869,32 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (gadgetData != null)
-                          Text(
-                            'Snap: $snapName',
-                            style: Theme.of(context).textTheme.headlineSmall,
+                          Row(
+                            children: [
+                              // Caption with bold font and same size as name
+                              SizedBox(
+                                width: 100,
+                                child: Text(
+                                  'Snap Name:',
+                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16, // Same size as name
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                //width: MediaQuery.of(context).size.width * 0.14, // 20% of available width
+                                width: 200,
+                                child: EditableTextField(
+                                  text: snapName ?? 'Unknown',
+                                  onSave: (newName) {
+                                    // Save to file when the user clicks save
+                                    _saveSnapNameToFile(newName);
+                                  },
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ),
+                            ],
                           )
                         else
                           const Text(
@@ -690,6 +909,18 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                             child: GadgetContent(
                               content: gadgetContent,
                               isAmd64: isAmd64Platform,
+                              filePath: gadgetFilePath,
+                              onContentChanged: (newContent) {
+                                // When content changes, update the state
+                                setState(() {
+                                  gadgetContent = newContent;
+                                });
+                              },
+                              onStatusUpdate: (message) {
+                                setState(() {
+                                  statusMessage = message;
+                                });
+                              },
                             ),
                           )
                         else
@@ -716,12 +947,5 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    // Clean up temporary files when the widget is disposed
-    _cleanupTempFiles();
-    super.dispose();
   }
 }

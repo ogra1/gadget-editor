@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:yaml/yaml.dart';
 import 'dart:math' as math;
+import 'package:gadget_editor/app/widgets/editable_text_field.dart';
+import 'package:yaml_edit/yaml_edit.dart';
+import 'package:file_selector/file_selector.dart';
+import 'dart:io'; // Add this import for File
 
 class GadgetVolumesSection extends StatelessWidget {
   final dynamic volumes;
   final VoidCallback? onEdit;
   final bool showEditButton;
+  final String? filePath; // Add file path parameter
 
   const GadgetVolumesSection({
     super.key,
     required this.volumes,
     this.onEdit,
     this.showEditButton = true,
+    this.filePath, // Add file path parameter
   });
 
   @override
@@ -26,23 +32,12 @@ class GadgetVolumesSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Volumes',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (showEditButton && onEdit != null)
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 16),
-                    onPressed: onEdit,
-                    tooltip: 'Edit Volumes',
-                  ),
-              ],
+            const Text(
+              'Volumes',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             const Text('No volumes defined. Click the edit icon to add volumes.'),
@@ -62,23 +57,12 @@ class GadgetVolumesSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Volumes',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (showEditButton && onEdit != null)
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 16),
-                      onPressed: onEdit,
-                      tooltip: 'Edit Volumes',
-                    ),
-                ],
+              const Text(
+                'Volumes',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               ...volumes.entries.map((entry) {
@@ -92,11 +76,18 @@ class GadgetVolumesSection extends StatelessWidget {
                       children: [
                         const Icon(Icons.storage, size: 20, color: Colors.grey),
                         const SizedBox(width: 8),
-                        Text(
-                          volumeName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        SizedBox(
+                          //width: MediaQuery.of(context).size.width * 0.14,
+                          width: 200,
+                          child: EditableTextField(
+                            text: volumeName,
+                            onSave: (newName) {
+                              // Update the volume name in the YAML file
+                              if (filePath != null) {
+                                _updateVolumeNameInFile(filePath!, volumeName, newName);
+                              }
+                            },
+                            style: const TextStyle(fontSize: 16),
                           ),
                         ),
                       ],
@@ -127,29 +118,70 @@ class GadgetVolumesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Volumes',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              if (showEditButton && onEdit != null)
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 16),
-                  onPressed: onEdit,
-                  tooltip: 'Edit Volumes',
-                ),
-            ],
+          const Text(
+            'Volumes',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           const Text('No volumes defined. Click the edit icon to add volumes.'),
         ],
       ),
     );
+  }
+  
+  // Function to update volume name in the YAML file
+  void _updateVolumeNameInFile(String filePath, String oldName, String newName) {
+    try {
+      // Read the existing file content
+      final file = File(filePath);
+      final content = file.readAsStringSync();
+      
+      // Parse the YAML content
+      final yaml = loadYaml(content);
+      
+      // Check if it's a YamlMap and has volumes
+      if (yaml is YamlMap && yaml.containsKey('volumes')) {
+        final volumes = yaml['volumes'];
+        
+        // Create a new volumes map with updated volume name
+        final newVolumes = <String, dynamic>{};
+        
+        // Iterate through existing volumes and update the name
+        if (volumes is YamlMap) {
+          for (var entry in volumes.entries) {
+            if (entry.key == oldName) {
+              newVolumes[newName] = entry.value;
+            } else {
+              newVolumes[entry.key] = entry.value;
+            }
+          }
+        } else if (volumes is Map<String, dynamic>) {
+          for (var entry in volumes.entries) {
+            if (entry.key == oldName) {
+              newVolumes[newName] = entry.value;
+            } else {
+              newVolumes[entry.key] = entry.value;
+            }
+          }
+        }
+        
+        // Create a new YamlEditor instance to update the file
+        final editor = YamlEditor(content);
+        
+        // Update the volumes section in the editor
+        editor.update(['volumes'], newVolumes);
+        
+        // Write back to file
+        file.writeAsStringSync(editor.toString());
+      }
+      
+    } catch (e) {
+      // Handle error appropriately in your app
+      print('Error updating volume name: $e');
+    }
   }
   
   Widget _buildPartitionVisualization(BuildContext context, List structure) {
@@ -279,8 +311,8 @@ class GadgetVolumesSection extends StatelessWidget {
     Map<String, Color> roleColors = {
       'system-seed': const Color(0xFF81C784), // Light green (pastel)
       'system-boot': const Color(0xFF64B5F6), // Light blue (pastel)
-      'system-save': const Color(0xFFFFB74D), // Light orange (pastel)
-      'system-data': const Color(0xFFBA68C8), // Light purple (pastel)
+      'system-save': const Color(0xFFBA68C8), // Light purple (pastel)
+      'system-data': const Color(0xFFB39DDB), // Light purple (pastel)
     };
     // If we have a role, use the role-based color and adjust intensity based on size
     if (role != null && roleColors.containsKey(role)) {

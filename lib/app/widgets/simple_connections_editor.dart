@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:yaml/yaml.dart';
+import 'dart:io';
+import 'package:path/path.dart' as path;
+import 'package:yaml_edit/yaml_edit.dart';
 
 class SimpleConnectionsEditor extends StatefulWidget {
   final dynamic connections;
+  final String? filePath;
   final Function(dynamic) onSave;
   final Function() onCancel;
+  final Function(String) onStatusUpdate;
 
   const SimpleConnectionsEditor({
     super.key,
     required this.connections,
+    this.filePath,
     required this.onSave,
     required this.onCancel,
+    required this.onStatusUpdate,
   });
 
   @override
@@ -19,7 +26,6 @@ class SimpleConnectionsEditor extends StatefulWidget {
 
 class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
   late List<Map<String, dynamic>> connectionsList;
-  bool isAddingNew = false;
   final _formKey = GlobalKey<FormState>();
   
   // Form fields
@@ -38,7 +44,10 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
     connectionsList = [];
     
     if (widget.connections is YamlMap) {
-      widget.connections.forEach((key, value) {
+      // Convert YamlMap to Map<String, dynamic> properly
+      final yamlMap = widget.connections.cast<String, dynamic>();
+      
+      yamlMap.forEach((key, value) {
         if (value is YamlMap) {
           connectionsList.add({
             'name': key,
@@ -90,7 +99,10 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
         }
       });
     } else if (widget.connections is List) {
-      for (var item in widget.connections) {
+      // Create a mutable copy of the List
+      final mutableList = List.from(widget.connections);
+      
+      for (var item in mutableList) {
         if (item is YamlMap) {
           // Parse the combined format for plug and slot
           String? plug = item['plug'];
@@ -140,293 +152,301 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
     super.dispose();
   }
 
-  void _addNewConnection() {
-    setState(() {
-      isAddingNew = true;
+  // Validate snap ID format
+  bool _isValidSnapId(String? snapId) {
+    if (snapId == null || snapId.isEmpty) {
+      return true; // Empty is allowed for optional fields
+    }
+    
+    // Snap IDs are exactly 32 characters
+    return snapId.length == 32;
+  }
+
+  // Validate that both snap ID and interface are provided together for plug
+  bool _validatePlugConnection(String? snapId, String? interface) {
+    // If snap ID is provided, interface must also be provided
+    if (snapId != null && snapId.isNotEmpty) {
+      return interface != null && interface.isNotEmpty;
+    }
+    // If no snap ID, interface is optional (but if provided, must have snap ID)
+    if (interface != null && interface.isNotEmpty) {
+      return false; // Interface without snap ID is invalid
+    }
+    return true; // Both empty is valid
+  }
+
+  // Validate that both snap ID and interface are provided together for slot
+  bool _validateSlotConnection(String? snapId, String? interface) {
+    // If snap ID is provided, interface must also be provided
+    if (snapId != null && snapId.isNotEmpty) {
+      return interface != null && interface.isNotEmpty;
+    }
+    // If no snap ID, interface is optional (but if provided, must have snap ID)
+    if (interface != null && interface.isNotEmpty) {
+      return false; // Interface without snap ID is invalid
+    }
+    return true; // Both empty is valid
+  }
+
+  // Save the updated connections back to the file
+  Future<void> _saveChangesToYaml() async {
+    if (widget.filePath == null) {
+      widget.onStatusUpdate('Error: No file path provided');
+      return;
+    }
+
+    try {
+      // Get form values
+      final plugSnapId = _plugSnapIdController.text.trim();
+      final plug = _plugController.text.trim();
+      final slotSnapId = _slotSnapIdController.text.trim();
+      final slot = _slotController.text.trim();
+      
+      // Validate inputs
+      if (plug.isEmpty) {
+        widget.onStatusUpdate('Error: Please enter a plug');
+        return;
+      }
+      
+      // Validate snap ID formats
+      if (plugSnapId.isNotEmpty && !_isValidSnapId(plugSnapId)) {
+        widget.onStatusUpdate('Error: Invalid plug snap ID format. Must be 32 characters');
+        return;
+      }
+      
+      if (slotSnapId.isNotEmpty && !_isValidSnapId(slotSnapId)) {
+        widget.onStatusUpdate('Error: Invalid slot snap ID format. Must be 32 characters');
+        return;
+      }
+      
+      // Validate that if snap IDs are provided, interfaces are also provided
+      if (!_validatePlugConnection(plugSnapId, plug)) {
+        widget.onStatusUpdate('Error: Plug requires snap ID and interface name');
+        return;
+      }
+      
+      if (!_validateSlotConnection(slotSnapId, slot)) {
+        widget.onStatusUpdate('Error: Slot requires snap ID and interface name');
+        return;
+      }
+      
+      // Read the existing file content
+      final file = File(widget.filePath!);
+      final content = await file.readAsString();
+      
+      // Parse the existing YAML
+      final yaml = loadYaml(content);
+      
+      // Create a YamlEditor instance to properly handle the YAML structure
+      final yamlEditor = YamlEditor(content);
+      
+      // Create the new connection
+      Map<String, dynamic> newConnection = {};
+      
+      // Build plug string
+      if (plugSnapId.isNotEmpty) {
+        newConnection['plug'] = '$plugSnapId:$plug';
+      } else {
+        newConnection['plug'] = plug;
+      }
+      
+      // Build slot string if provided
+      if (slot.isNotEmpty) {
+        if (slotSnapId.isNotEmpty) {
+          newConnection['slot'] = '$slotSnapId:$slot';
+        } else {
+          newConnection['slot'] = slot;
+        }
+      }
+      
+      // Handle connections structure - THIS IS THE CORRECT APPROACH
+      if (yaml.containsKey('connections')) {
+        // Connections already exists - update it properly
+        final existingConnections = yaml['connections'];
+        List<dynamic> updatedConnections;
+        
+        if (existingConnections is List) {
+          updatedConnections = List.from(existingConnections);
+        } else if (existingConnections is YamlMap) {
+          final connectionsList = <dynamic>[];
+          for (var key in existingConnections.keys) {
+            connectionsList.add(existingConnections[key]);
+          }
+          updatedConnections = connectionsList;
+        } else {
+          updatedConnections = [newConnection];
+        }
+        
+        // Add new connection to the list - avoiding duplicates
+        bool connectionExists = false;
+        for (var existing in updatedConnections) {
+          if (existing == newConnection) {
+            connectionExists = true;
+            break;
+          }
+        }
+        
+        if (!connectionExists) {
+          updatedConnections.add(newConnection);
+        }
+        
+        // Update connections directly
+        yamlEditor.update(['connections'], updatedConnections);
+      } else {
+        // NEW connections section - USE THE EXACT APPROACH FROM OTHER AI
+        // The key is to parse the root structure and rebuild it
+        final rootMap = yamlEditor.parseAt([]) as YamlMap;
+        final updatedRoot = Map.from(rootMap);
+        
+        // Add the new connections section to the updated root
+        updatedRoot['connections'] = [newConnection];
+        
+        // Use wrapAsYamlNode but with careful formatting to avoid quotes
+        // The approach from the other AI example - rebuild the entire structure
+        yamlEditor.update([], wrapAsYamlNode(updatedRoot, collectionStyle: CollectionStyle.BLOCK));
+      }
+      
+      // Write back to file using yaml_editor's toString() method
+      final newYamlString = yamlEditor.toString();
+      
+      // Write back to file
+      await file.writeAsString(newYamlString);
+      
+      // Show success message via status bar
+      widget.onStatusUpdate('Connection added successfully');
+      
+      // Notify parent that changes were saved
+      widget.onSave([newConnection]);
+      
+      // Clear form fields
       _plugSnapIdController.clear();
       _plugController.clear();
       _slotSnapIdController.clear();
       _slotController.clear();
-    });
-  }
-
-  void _saveConnection() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        connectionsList.add({
-          'name': '${_plugController.text}-${_slotController.text}',
-          'plug': _plugController.text,
-          'plugSnapId': _plugSnapIdController.text,
-          'slot': _slotController.text,
-          'slotSnapId': _slotSnapIdController.text,
-          'isExisting': false,
-        });
-        isAddingNew = false;
-      });
+      
+    } catch (e) {
+      widget.onStatusUpdate('Error saving changes: $e');
     }
-  }
-
-  void _removeConnection(int index) {
-    setState(() {
-      connectionsList.removeAt(index);
-    });
-  }
-
-  void _saveChanges() {
-    // Convert back to connections structure
-    List<Map<String, dynamic>> updatedConnections = [];
-    
-    for (var conn in connectionsList) {
-      Map<String, dynamic> connectionData = {
-        'plug': conn['plugSnapId'] != null && conn['plugSnapId'] != ''
-            ? '${conn['plugSnapId']}:${conn['plug']}'
-            : conn['plug'],
-        'slot': conn['slotSnapId'] != null && conn['slotSnapId'] != ''
-            ? '${conn['slotSnapId']}:${conn['slot']}'
-            : conn['slot'],
-      };
-      
-      if (conn['plugSnapId'] != null && conn['plugSnapId']!.isNotEmpty) {
-        connectionData['plugSnapId'] = conn['plugSnapId'];
-      }
-      
-      if (conn['slotSnapId'] != null && conn['slotSnapId']!.isNotEmpty) {
-        connectionData['slotSnapId'] = conn['slotSnapId'];
-      }
-      
-      updatedConnections.add(connectionData);
-    }
-    
-    widget.onSave(updatedConnections);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Removed the caption entirely - only one caption should exist
-          const SizedBox(height: 16),
-          
-          // Connection list
-          Expanded(
-            child: ListView.builder(
-              itemCount: connectionsList.length,
-              itemBuilder: (context, index) {
-                final connection = connectionsList[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Input block for new connection - always shown
+        Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Plug line with label
+              Row(
+                children: [
+                  const SizedBox(width: 100, child: Text('Plug:')),
+                  const SizedBox(width: 16), // Added padding between label and field
+                  Expanded(
+                    child: Row(
                       children: [
-                        // Plug line with snap ID - if we have snap ID, show it; otherwise show plug value directly
-                        Row(
-                          children: [
-                            Container(
-                              width: 40, // Fixed width to ensure alignment
-                              alignment: Alignment.centerLeft,
-                              child: const Text('Plug: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                            Expanded(
-                              child: Text(
-                                // Show snapId:interface if snapId exists, otherwise just interface
-                                '${connection['plugSnapId'] != null && connection['plugSnapId'] != '' ? '${connection['plugSnapId']!}:' : ''}${connection['plug'] ?? 'N/A'}',
-                                style: const TextStyle(fontFamily: 'monospace'),
-                              ),
-                            ),
-                          ],
-                        ),
-                        // Slot line - only show if slot is defined, without "(optional)" text
-                        if (connection['slot'] != null && connection['slot']!.isNotEmpty)
-                          Row(
-                            children: [
-                              Container(
-                                width: 40, // Fixed width to ensure alignment
-                                alignment: Alignment.centerLeft,
-                                child: const Text('Slot: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  // Show snapId:interface if snapId exists, otherwise just interface
-                                  '${connection['slotSnapId'] != null && connection['slotSnapId'] != '' ? '${connection['slotSnapId']!}:' : ''}${connection['slot'] ?? 'N/A'}',
-                                  style: const TextStyle(fontFamily: 'monospace'),
-                                ),
-                              ),
-                            ],
+                        Expanded(
+                          flex: 5, // Increased flex to give more space to snap ID
+                          child: TextFormField(
+                            controller: _plugSnapIdController,
+                            decoration: const InputDecoration(labelText: 'Snap ID'),
+                            validator: (value) {
+                              if (value != null && value.isNotEmpty && !_isValidSnapId(value)) {
+                                return 'Invalid snap ID format. Must be 32 characters';
+                              }
+                              return null;
+                            },
                           ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => _removeConnection(index),
-                              tooltip: 'Delete Connection',
-                            ),
-                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3, // Reduced flex to give less space to interface
+                          child: TextFormField(
+                            controller: _plugController,
+                            decoration: const InputDecoration(labelText: 'Interface Plug'),
+                            validator: (value) {
+                              // Validate that if snap ID is provided, interface is also provided
+                              final plugSnapId = _plugSnapIdController.text.trim();
+                              if (plugSnapId.isNotEmpty && (value == null || value.isEmpty)) {
+                                return 'Plug requires snap ID and interface name';
+                              }
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter a plug';
+                              }
+                              return null;
+                            },
+                          ),
                         ),
                       ],
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Add new connection button
-          if (!isAddingNew)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _addNewConnection,
-              tooltip: 'Add New Connection',
-              style: IconButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ],
               ),
-            ),
-          
-          if (isAddingNew) ...[
-            const SizedBox(height: 16),
-            // Input block constrained to 2/3 width but wrapped in a container that spans 100%
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 2 / 3,
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Plug line with label
-                          Row(
-                            children: [
-                              const SizedBox(width: 100, child: Text('Plug:')),
-                              const SizedBox(width: 16), // Added padding between label and field
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 5, // Increased flex to give more space to snap ID
-                                      child: TextFormField(
-                                        controller: _plugSnapIdController,
-                                        decoration: const InputDecoration(labelText: 'Snap ID'),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Please enter a plug snap ID';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 3, // Reduced flex to give less space to interface
-                                      child: TextFormField(
-                                        controller: _plugController,
-                                        decoration: const InputDecoration(labelText: 'Interface Plug'),
-                                        validator: (value) {
-                                          if (value == null || value.isEmpty) {
-                                            return 'Please enter a plug';
-                                          }
-                                          return null;
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Reduced spacer size from 30% to 5% to give more space to fields
-                              SizedBox(
-                                width: MediaQuery.of(context).size.width * 0.05,
-                              ),
-                            ],
+              const SizedBox(height: 8),
+              // Slot line with label - keeping "(optional)" in input form
+              Row(
+                children: [
+                  const SizedBox(width: 100, child: Text('Slot (optional):')),
+                  const SizedBox(width: 16), // Added padding between label and field
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 5, // Increased flex to give more space to snap ID
+                          child: TextFormField(
+                            controller: _slotSnapIdController,
+                            decoration: const InputDecoration(labelText: 'Snap ID'),
+                            validator: (value) {
+                              if (value != null && value.isNotEmpty && !_isValidSnapId(value)) {
+                                return 'Invalid snap ID format. Must be 32 characters';
+                              }
+                              return null;
+                            },
                           ),
-                          const SizedBox(height: 16),
-                          // Slot line with label - keeping "(optional)" in input form
-                          Row(
-                            children: [
-                              const SizedBox(width: 100, child: Text('Slot (optional):')),
-                              const SizedBox(width: 16), // Added padding between label and field
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      flex: 5, // Increased flex to give more space to snap ID
-                                      child: TextFormField(
-                                        controller: _slotSnapIdController,
-                                        decoration: const InputDecoration(labelText: 'Snap ID'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      flex: 3, // Reduced flex to give less space to interface
-                                      child: TextFormField(
-                                        controller: _slotController,
-                                        decoration: const InputDecoration(labelText: 'Interface Slot'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Reduced spacer size from 30% to 5% to give more space to fields
-                              SizedBox(
-                                width: MediaQuery.of(context).size.width * 0.05,
-                              ),
-                            ],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3, // Reduced flex to give less space to interface
+                          child: TextFormField(
+                            controller: _slotController,
+                            decoration: const InputDecoration(labelText: 'Interface Slot'),
+                            validator: (value) {
+                              // Validate that if snap ID is provided, interface is also provided
+                              final slotSnapId = _slotSnapIdController.text.trim();
+                              if (slotSnapId.isNotEmpty && (value == null || value.isEmpty)) {
+                                return 'Slot requires snap ID and interface name';
+                              }
+                              return null;
+                            },
                           ),
-                          const SizedBox(height: 16),
-                          // Buttons row - this will stay in bottom right
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    isAddingNew = false;
-                                  });
-                                },
-                                child: const Text('Cancel'),
-                              ),
-                              ElevatedButton(
-                                onPressed: _saveConnection,
-                                child: const Text('Save Connection'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
-          
-          const SizedBox(height: 16),
-          
-          // Save and Cancel buttons (only shown when not adding new)
-          if (!isAddingNew)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: widget.onCancel,
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: _saveChanges,
-                  child: const Text('Save Changes'),
-                ),
-              ],
-            ),
-        ],
-      ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Buttons row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: widget.onCancel,
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: _saveChangesToYaml,
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
