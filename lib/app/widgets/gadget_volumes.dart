@@ -5,6 +5,7 @@ import 'package:gadget_editor/app/widgets/editable_text_field.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import 'package:file_selector/file_selector.dart';
 import 'dart:io'; // Add this import for File
+import 'package:gadget_editor/app/widgets/partition_size_editor.dart'; // Import the new editor
 
 class GadgetVolumesSection extends StatelessWidget {
   final dynamic volumes;
@@ -94,7 +95,7 @@ class GadgetVolumesSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     if (volumeData['structure'] != null && volumeData['structure'] is List) 
-                      _buildPartitionVisualization(context, volumeData['structure']) 
+                      _buildPartitionVisualization(context, volumeData['structure'], volumeName)
                     else if (volumeData['structure'] == null) 
                       const Text('No structure field found') 
                     else 
@@ -184,7 +185,7 @@ class GadgetVolumesSection extends StatelessWidget {
     }
   }
 
-  Widget _buildPartitionVisualization(BuildContext context, List structure) {
+  Widget _buildPartitionVisualization(BuildContext context, List structure, String volumeName) {
     if (structure.isEmpty) {
       return Container(
         height: 80,
@@ -247,16 +248,59 @@ class GadgetVolumesSection extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Expanded(
-                      child: Text(
-                        item['name'] ?? 'Unnamed',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      child: Stack(
+                        children: [
+                          // Text content centered
+                          Center(
+                            child: Text(
+                              item['name'] ?? 'Unnamed',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Edit icon for system-seed and system-data partitions
+                          if (item['role'] == 'system-seed' || item['role'] == 'system-data')
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () {
+                                  // Show the partition size editor dialog
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return PartitionSizeEditor(
+                                        partitionName: item['name'] ?? 'Unnamed',
+                                        currentSize: _formatSize(item['size']),
+                                        onSave: (newSize) {
+                                          // Close the dialog
+                                          Navigator.of(context).pop();
+                                          // Update the size in the YAML file
+                                          if (filePath != null) {
+                                            _updatePartitionSizeInFile(filePath!, volumeName, item['name'], newSize);
+                                          }
+                                        },
+                                        onCancel: () {
+                                          Navigator.of(context).pop();
+                                        },
+                                      );
+                                    },
+                                  );
+                                },
+                                child: Icon(
+                                  Icons.edit,
+                                  size: 18, // Larger size
+                                  color: Colors.white, // White color for better visibility
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     Text(
@@ -366,6 +410,55 @@ class GadgetVolumesSection extends StatelessWidget {
     } else {
       // Large partitions - dark blue (but still pastel-like)
       return const Color(0xFF1976D2); // Darker blue
+    }
+  }
+
+  // Function to update partition size in the YAML file
+  void _updatePartitionSizeInFile(String filePath, String volumeName, String partitionName, String newSize) {
+    try {
+      // Read the existing file content
+      final file = File(filePath);
+      final content = file.readAsStringSync();
+
+      // Parse the YAML content
+      final yaml = loadYaml(content);
+
+      // Check if it's a YamlMap and has volumes
+      if (yaml is YamlMap && yaml.containsKey('volumes')) {
+        final volumes = yaml['volumes'];
+
+        // Find the specific volume and update its structure
+        if (volumes is YamlMap) {
+          for (var entry in volumes.entries) {
+            if (entry.key == volumeName) {
+              final volumeData = entry.value;
+
+              // Check if the structure exists and is a list
+              if (volumeData['structure'] is List) {
+                final structure = volumeData['structure'];
+
+                // Find and update the specific partition with matching name
+                for (var i = 0; i < structure.length; i++) {
+                  if (structure[i]['name'] == partitionName) {
+                    structure[i]['size'] = newSize;
+                    break;
+                  }
+                }
+
+                // Update the structure in the editor
+                final editor = YamlEditor(content);
+                editor.update(['volumes', volumeName, 'structure'], structure);
+                file.writeAsStringSync(editor.toString());
+                break;
+              }
+            }
+          }
+        }
+      }
+
+    } catch (e) {
+      // Handle error appropriately in your app
+      print('Error updating partition size: $e');
     }
   }
 }
