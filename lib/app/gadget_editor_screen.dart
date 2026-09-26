@@ -714,6 +714,8 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   // New function to pack a snap package
   Future<void> _packSnap() async {
     // Check if we have a gadget file loaded
+	String? snapVar = Platform.environment['SNAP'];
+
     if (gadgetFilePath == null) {
       setState(() {
         statusMessage = 'No gadget file loaded. Please load a snap first.';
@@ -748,7 +750,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       final parentDir = path.dirname(gadgetDir);
       
       // Check if snap_pack exists in bin/
-      final snapPackPath = './bin/snap_pack';
+      final snapPackPath = '${snapVar}/bin/snap_pack';
       
       // Check if the snap_pack tool exists
       final snapPackFile = File(snapPackPath);
