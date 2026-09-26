@@ -17,6 +17,7 @@ import 'widgets/gadget_content.dart';
 import 'widgets/empty_state.dart';
 import 'widgets/editable_text_field.dart'; // Import the new widget';
 import 'package:yaml_edit/yaml_edit.dart'; // Import yaml_edit package
+import 'utils/snap_name_validator.dart'; // Import the validation utility
 
 // Global variable to store the temp directory path
 Directory? globalTempDirectory;
@@ -647,11 +648,20 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
     }
   }
 
-  // Function to save the edited snap name to the file
+  // Function to save the edited snap name to the file with validation
   Future<void> _saveSnapNameToFile(String newName) async {
     if (snapFilePath == null) {
       setState(() {
         statusMessage = 'Error: No snap.yaml file path available';
+      });
+      return;
+    }
+
+    // Validate the snap name
+    final validationResult = SnapNameValidator.validate(newName);
+    if (!validationResult.isValid) {
+      setState(() {
+        statusMessage = 'Invalid snap name: ${validationResult.errorMessage}';
       });
       return;
     }
