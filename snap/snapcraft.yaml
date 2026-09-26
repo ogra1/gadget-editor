@@ -67,8 +67,8 @@ parts:
       
       # Fix permissions
       chmod +x $CRAFT_PART_INSTALL/bin/*
+
     override-prime: |
       craftctl default
       # Clean up Flutter git files
-      rm -rf $CRAFT_PRIME/usr/libexec/flutter/.git
-
+      rm -rf $CRAFT_PRIME/usr/libexec
