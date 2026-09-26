@@ -4,23 +4,25 @@ import 'dart:math' as math;
 import 'package:gadget_editor/app/widgets/editable_text_field.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import 'package:file_selector/file_selector.dart';
-import 'dart:io'; // Add this import for File
-import 'package:gadget_editor/app/widgets/partition_size_editor.dart'; // Import the new editor
+import 'dart:io';
+import 'package:gadget_editor/app/widgets/partition_size_editor.dart';
 
 class GadgetVolumesSection extends StatefulWidget {
   final dynamic volumes;
   final VoidCallback? onEdit;
   final bool showEditButton;
-  final String? filePath; // Add file path parameter
+  final String? filePath;
   final VoidCallback? refreshCallback;
+  final Function(String)? onStatusUpdate;
 
   const GadgetVolumesSection({
     super.key,
     required this.volumes,
     this.onEdit,
     this.showEditButton = true,
-    this.filePath, // Add file path parameter
+    this.filePath,
     this.refreshCallback,
+    this.onStatusUpdate,
   });
 
   @override
@@ -48,7 +50,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text('No volumes defined. Click the edit icon to add volumes.'),
+            const Text('No volumes defined.'),
           ],
         ),
       );
@@ -184,6 +186,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
 
         // Write back to file
         file.writeAsStringSync(editor.toString());
+		//widget.onStatusUpdate('Volume name updates successfully');
       }
 
     } catch (e) {
@@ -298,8 +301,12 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                                           Navigator.of(context).pop();
                                         },
                                         onStatusUpdate: (message) {
-                                          // Handle status updates if needed
-                                          // This could update a status bar in the parent
+                                          if (widget.onStatusUpdate != null) {
+                                            widget.onStatusUpdate!(message);
+                                          } else if (widget.refreshCallback != null) {
+                                            // Fallback to refresh if no status update callback
+                                            widget.refreshCallback!();
+                                          }
                                         },
                                         onPartitionChanged: () {
                                           // Trigger refresh when partition is changed

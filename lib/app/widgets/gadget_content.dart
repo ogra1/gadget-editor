@@ -163,6 +163,7 @@ class _GadgetContentState extends State<GadgetContent> {
             volumes: volumes,
             filePath: widget.filePath,
             refreshCallback: _refreshContentFromFile,
+            onStatusUpdate: widget.onStatusUpdate,
           ),
           const SizedBox(height: 16),
 
