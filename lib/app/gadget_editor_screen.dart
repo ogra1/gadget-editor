@@ -701,6 +701,94 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
     }
   }
 
+  // New function to pack a snap package
+  Future<void> _packSnap() async {
+    // Check if we have a gadget file loaded
+    if (gadgetFilePath == null) {
+      setState(() {
+        statusMessage = 'No gadget file loaded. Please load a snap first.';
+      });
+      return;
+    }
+
+    try {
+      setState(() {
+        statusMessage = 'Select directory to save packed snap...';
+      });
+
+      // Show directory selection dialog to let user choose where to save the packed snap
+      final directory = await getDirectoryPath();
+      
+      if (directory == null) {
+        setState(() {
+          statusMessage = 'Pack snap cancelled by user.';
+        });
+        return;
+      }
+
+      setState(() {
+        statusMessage = 'Packing snap...';
+      });
+
+      // Get the directory that contains the gadget.yaml file
+      final gadgetDir = path.dirname(gadgetFilePath!);
+      
+      // The snap_pack tool expects a directory containing meta/ 
+      // The gadgetDir points to meta/ directory, so we need to get the parent
+      final parentDir = path.dirname(gadgetDir);
+      
+      // Check if snap_pack exists in bin/
+      final snapPackPath = './bin/snap_pack';
+      
+      // Check if the snap_pack tool exists
+      final snapPackFile = File(snapPackPath);
+      if (!await snapPackFile.exists()) {
+        setState(() {
+          statusMessage = 'Error: snap_pack tool not found at $snapPackPath';
+        });
+        return;
+      }
+
+      // Run the snap_pack command
+      final process = await Process.run(
+        snapPackPath,
+        [parentDir, directory],
+        runInShell: true,
+      );
+      
+      if (process.exitCode != 0) {
+        setState(() {
+          statusMessage = 'Error packing snap: ${process.stderr}';
+        });
+        return;
+      }
+      
+      // Extract the snap file name from the output (if available)
+      String? snapFileName;
+      final outputLines = process.stdout.toString().split('\n');
+      for (var line in outputLines) {
+        if (line.contains('.snap')) {
+          final parts = line.split('/');
+          if (parts.isNotEmpty) {
+            snapFileName = parts.last.trim();
+            break;
+          }
+        }
+      }
+      
+      setState(() {
+        statusMessage = snapFileName != null 
+            ? 'Snap packed successfully to $directory/$snapFileName'
+            : 'Snap packed successfully to $directory';
+      });
+      
+    } catch (e) {
+      setState(() {
+        statusMessage = 'Error packing snap: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -938,11 +1026,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
           StatusBar(
             message: statusMessage,
             isActionButtonEnabled: isActionButtonEnabled,
-            onActionPressed: () {
-              setState(() {
-                statusMessage = 'Action button clicked!';
-              });
-            },
+            onActionPressed: _packSnap,
           ),
         ],
       ),

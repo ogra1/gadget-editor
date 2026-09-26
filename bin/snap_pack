@@ -273,12 +273,12 @@ def check_mksquashfs_availability():
     except (subprocess.SubprocessError, FileNotFoundError):
         return False
 
-def create_snap_package(snap_dir, output_file=None):
+def create_snap_package(snap_dir, target_dir=None):
     """Create a valid snap package (.snap file) from a snap directory structure.
     
     Args:
         snap_dir (str): Path to the snap directory containing meta/snap.yaml
-        output_file (str): Path to the output .snap file (optional)
+        target_dir (str): Path to the target directory where snap file will be created (optional)
     
     Returns:
         str: Path to the created snap package
@@ -314,22 +314,26 @@ def create_snap_package(snap_dir, output_file=None):
     print(f"Package version: {version}")
     
     # Determine output filename
-    if output_file is None:
-        # Use the standard naming convention: $name_$version.snap
-        output_file = f"{name}_{version}.snap"
-        print(f"Generated output file name: {output_file}")
+    output_file = f"{name}_{version}.snap"
+    
+    # Determine output directory
+    if target_dir:
+        output_dir = Path(target_dir)
+        output_dir.mkdir(exist_ok=True)
+        output_file = output_dir / output_file
     else:
-        # If output file is specified, use it as-is
-        print(f"Using specified output file name: {output_file}")
+        # Use the current directory where the script is run
+        output_file = Path(output_file)
+    
+    print(f"Output file: {output_file}")
+    print(f"Compression method: {compression}")
+    print(f"Snap type: {snap_type}")
     
     # Check if mksquashfs is available
     if not check_mksquashfs_availability():
         raise RuntimeError("mksquashfs is not available on this system. Please install squashfs-tools package.")
     
     print(f"Creating snap package from {snap_dir}")
-    print(f"Output file: {output_file}")
-    print(f"Compression method: {compression}")
-    print(f"Snap type: {snap_type}")
     
     # Create temporary directory for squashfs creation
     temp_dir = Path(f"{output_file}.tmp")
@@ -373,7 +377,7 @@ def create_snap_package(snap_dir, output_file=None):
             raise RuntimeError(f"Failed to create snap package: {output_file}")
         
         print(f"Successfully created snap package: {output_file}")
-        return output_file
+        return str(output_file)
         
     except Exception as e:
         # Clean up temporary directory on error
@@ -407,17 +411,18 @@ def validate_gadget_snap_requirements(snap_dir):
 def main():
     """Main function for command-line usage."""
     if len(sys.argv) < 2:
-        print("Usage: snap_pack <snap_directory> [output_file]")
-        print("Example: snap_pack ./my-snap ./my-app.snap")
+        print("Usage: snap_pack <snap_directory> [target_directory]")
+        print("Example: snap_pack ./my-snap ./output-dir")
         print("\nRepacks existing snap directory structures into valid .snap files")
+        print("Snap file will be created in target directory or current directory")
         print("Following standard snap naming convention: $name_$version.snap")
         return
     
     snap_dir = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    target_dir = sys.argv[2] if len(sys.argv) > 2 else None
     
     try:
-        result = create_snap_package(snap_dir, output_file)
+        result = create_snap_package(snap_dir, target_dir)
         print(f"Successfully created valid snap package: {result}")
         print("This snap package should be compatible with snap store upload")
     except Exception as e:
