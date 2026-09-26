@@ -187,6 +187,9 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
         // Write back to file
         file.writeAsStringSync(editor.toString());
         widget.onStatusUpdate!('Volume name updated successfully');
+        if (widget.refreshCallback != null) {
+          widget.refreshCallback!();
+        }
       }
 
     } catch (e) {
