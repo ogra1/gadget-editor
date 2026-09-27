@@ -8,6 +8,7 @@ class EditableTextField extends StatefulWidget {
   final TextStyle? style;
   final TextAlign? textAlign;
   final bool enabled;
+  final Function(EditableTextFieldState)? onStateCreated;
 
   const EditableTextField({
     super.key,
@@ -18,6 +19,7 @@ class EditableTextField extends StatefulWidget {
     this.style,
     this.textAlign,
     this.enabled = true,
+    this.onStateCreated,
   });
 
   @override
@@ -28,12 +30,17 @@ class _EditableTextFieldState extends State<EditableTextField> {
   late TextEditingController _controller;
   bool _isEditing = false;
   late String _currentText;
+  late String _originalText; // Store the original text for reset
 
   @override
   void initState() {
     super.initState();
     _currentText = widget.text;
+    _originalText = widget.text;
     _controller = TextEditingController(text: _currentText);
+    
+    // Expose the state to parent widget
+    widget.onStateCreated?.call(EditableTextFieldState(_resetToOriginal));
   }
 
   @override
@@ -43,6 +50,7 @@ class _EditableTextFieldState extends State<EditableTextField> {
     if (widget.text != oldWidget.text) {
       setState(() {
         _currentText = widget.text;
+        _originalText = widget.text;
         _controller.text = _currentText;
       });
     }
@@ -52,6 +60,14 @@ class _EditableTextFieldState extends State<EditableTextField> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  // Private reset method
+  void _resetToOriginal() {
+    setState(() {
+      _currentText = _originalText;
+      _controller.text = _currentText;
+    });
   }
 
   @override
@@ -64,11 +80,6 @@ class _EditableTextFieldState extends State<EditableTextField> {
               controller: _controller,
               decoration: widget.decoration ??
                   InputDecoration(
-              //      border: InputBorder.none,
-              //      focusedBorder: InputBorder.none,
-              //      enabledBorder: InputBorder.none,
-              //      errorBorder: InputBorder.none,
-              //      disabledBorder: InputBorder.none,
                     filled: true,
                     fillColor: Theme.of(context).primaryColor.withOpacity(0.1),
                     contentPadding: EdgeInsets.zero,
@@ -83,6 +94,7 @@ class _EditableTextFieldState extends State<EditableTextField> {
                 setState(() {
                   _isEditing = false;
                 });
+                // Call the onSave callback with the new value
                 widget.onSave(value);
               },
               autofocus: true,
@@ -96,6 +108,7 @@ class _EditableTextFieldState extends State<EditableTextField> {
                 _isEditing = false;
                 _currentText = value;
               });
+              // Call the onSave callback with the new value
               widget.onSave(value);
             },
             tooltip: 'Save',
@@ -125,4 +138,11 @@ class _EditableTextFieldState extends State<EditableTextField> {
       ],
     );
   }
+}
+
+// State class to provide external access to the widget's functionality
+class EditableTextFieldState {
+  final VoidCallback resetToOriginal;
+  
+  EditableTextFieldState(this.resetToOriginal);
 }

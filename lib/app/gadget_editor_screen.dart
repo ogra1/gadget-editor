@@ -66,9 +66,11 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   // Store the snap.yaml file path for saving snap name
   String? snapFilePath;
 
-  // Editing state for snap name
-  bool _isEditingSnapName = false;
-  final TextEditingController _snapNameController = TextEditingController();
+  // Keep track of original snap name for reset functionality
+  String? _originalSnapName;
+  
+  // Reference to the EditableTextField for reset functionality
+  EditableTextFieldState? _snapNameFieldState;
 
   @override
   void initState() {
@@ -663,6 +665,9 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       setState(() {
         statusMessage = 'Invalid snap name: ${validationResult.errorMessage}';
       });
+      
+      // Reset the text field to original value when validation fails
+      _snapNameFieldState?.resetToOriginal();
       return;
     }
 
@@ -992,6 +997,10 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                     _saveSnapNameToFile(newName);
                                   },
                                   style: const TextStyle(fontSize: 16),
+                                  onStateCreated: (state) {
+                                    // Capture the state reference for later use
+                                    _snapNameFieldState = state;
+                                  },
                                 ),
                               ),
                             ],
