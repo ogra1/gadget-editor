@@ -243,7 +243,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       } else {
         // Get the response body for better error details
         final errorBody = await response.transform(utf8.decoder).join();
-        throw Exception('Snap not found: ${response.statusCode} - $errorBody');
+        throw Exception('Snap not found: ' + snapName);
       }
     } catch (e) {
       setState(() {
