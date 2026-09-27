@@ -153,6 +153,12 @@ class _PartitionSizeEditorState extends State<PartitionSizeEditor> {
                   }
                   return null;
                 },
+                onEditingComplete: () {
+                  // Trigger save when Enter key is pressed
+                  if (_formKey.currentState!.validate()) {
+                    _saveChangesToYaml();
+                  }
+                },
               ),
             ],
           ),
