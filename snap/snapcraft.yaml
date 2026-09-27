@@ -1,11 +1,37 @@
 name: gadget-editor
 title: Gadget Editor
 version: '0.1.0'
-summary: GUI tool for editing gadget YAML files for Ubuntu Core
+summary: Edit Ubuntu Core Gadget Snap Packages
 description: |
-  A graphical tool for editing gadget YAML files used in Ubuntu Core systems.
-  Allows users to view, modify, and save gadget configuration files for 
-  Ubuntu Core devices.
+  An editor for binary Gadget Snap packages to easily:
+
+    - change volume sizes of the seed and data partitions
+    - add/remove entries for auto connections of snaps in the image
+    - apply default configurations for snap packages seeded in the image
+    - manage kernel command-line parameters
+    - change the image file name in the volume definition
+    - and indeed change the name of the snap itself
+
+  You can search and download existing gadget snaps from the global store with
+  the built in search function or import a local gadget snap file to edit it.
+
+  The gadget snap will only be re-packed after the edit and does not need to be
+  compiled from source (which provides full cross architecture support).
+
+  Note that the existing snap assertions will not match anymore after the edit
+  and you will have to either re-upload to the store to obtain a fresh signature
+  or use it with a "dangerous" model assertion for local image builds.
+
+  If you need to load/save gadget files to/from external media, you need to
+  connect the removable-media snap interface with:
+
+      sudo snap connect gadget-editor:removable-media
+
+contact: https://github.com/ogra1/gadget-editor/issues
+license: GPL-2.0-only
+issues: https://github.com/ogra1/gadget-editor/issues
+source-code: https://github.com/ogra1/gadget-editor
+website: https://github.com/ogra1/gadget-editor
 
 confinement: strict
 grade: stable
@@ -27,8 +53,6 @@ apps:
       - home
       - network
       - removable-media
-      - desktop
-      - desktop-legacy
     extensions: [gnome]
 
 parts:
