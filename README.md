@@ -24,6 +24,14 @@ connect the removable-media snap interface with:
 
     sudo snap connect gadget-editor:removable-media
 
+## TODO
+
+Planned additional features:
+
+  - adding/removing device slot declarations for snap interfaces
+  - handling API keys for private stores in gadget snaps that already support it
+  - allow editing of the prepare-device onboarding hook from the app
+
 ## Building
 
 Just clone this tree and run `snapcraft pack` in the top-level of it.
