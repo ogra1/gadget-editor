@@ -44,8 +44,9 @@ class ChannelList extends StatelessWidget {
         // Check if this channel is selected  
         bool isSelected = false;
         if (selectedChannel != null) {
-          isSelected = selectedChannel?['channel']?['track'] == track &&  
-                      selectedChannel?['channel']?['risk'] == risk;  
+          isSelected = selectedChannel?['channel']?['track'] == track &&
+                      selectedChannel?['channel']?['risk'] == risk &&
+                      selectedChannel?['channel']?['architecture'] == architecture;
         }
 
         if (isSelected) {

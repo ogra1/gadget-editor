@@ -198,14 +198,17 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
             .where((channel) => !channel['channel']['track'].toString().contains('.'))
             .toList();
 
-        // Group channels by track/risk and select the one with highest revision
+        // Group channels by track/risk/architecture and select the one with
+        // the highest revision per group (store revisions are globally unique,
+        // so one entry per architecture must be kept).
         final uniqueChannels = <Map<String, dynamic>>[];
         final channelGroups = <String, List<Map<String, dynamic>>>{};
 
         for (var channel in gadgetChannels) {
           final track = channel['channel']['track'] as String?;
           final risk = channel['channel']['risk'] as String?;
-          final key = '${track}/${risk}';
+          final architecture = channel['channel']['architecture'] as String?;
+          final key = '$track/$risk/$architecture';
 
           if (!channelGroups.containsKey(key)) {
             channelGroups[key] = [];
@@ -230,6 +233,22 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
             uniqueChannels.add(maxRevisionChannel);
           }
         }
+
+        // Present the channels in a stable, predictable order
+        uniqueChannels.sort((a, b) {
+          String part(Map<String, dynamic> channel, String key) =>
+              (channel['channel'][key] as String?) ?? '';
+
+          int result = part(a, 'track').compareTo(part(b, 'track'));
+          if (result != 0) {
+            return result;
+          }
+          result = part(a, 'risk').compareTo(part(b, 'risk'));
+          if (result != 0) {
+            return result;
+          }
+          return part(a, 'architecture').compareTo(part(b, 'architecture'));
+        });
 
         setState(() {
           availableChannels = uniqueChannels.map((channel) {
