@@ -46,6 +46,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   bool isLoading = false;
   String error = '';
   String statusMessage = 'Ready'; // Status bar message
+  bool isDownloading = false;
   bool isActionButtonEnabled = false; // Button is inactive by default
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> availableChannels = [];
@@ -244,7 +245,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
   Future<void> downloadSelectedChannel(Map<String, dynamic> channel) async {
     setState(() {
-      isLoading = true;
+      isDownloading = true;
       error = '';
       isLocalMode = false; // Switch to remote mode
       statusMessage = 'Downloading selected channel...';
@@ -318,7 +319,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       });
     } finally {
       setState(() {
-        isLoading = false;
+        isDownloading = false;
       });
     }
   }
@@ -532,9 +533,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      if (isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else if (availableChannels.isNotEmpty)
+                      if (availableChannels.isNotEmpty)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,8 +549,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                 child: ChannelList(
                                   channels: availableChannels,
                                   onChannelSelected: downloadSelectedChannel,
-                                  isLoading: isLoading,
-                                  error: error,
+                                  isDownloading: isDownloading,
                                   selectedChannel: selectedChannel,
                                 ),
                               ),
@@ -573,13 +571,15 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                               Expanded(
                                 child: ListView(
                                   children: [
-                                    // Show local snap info
-                                    Container(
+                                    // Show local snap info (a Card so the
+                                    // ListTile's ink has a Material to paint on).
+                                    Card(
+                                      elevation: 0,
                                       margin: const EdgeInsets.symmetric(vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                        border: Border.all(color: Theme.of(context).primaryColor),
+                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                      shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
+                                        side: BorderSide(color: Theme.of(context).primaryColor),
                                       ),
                                       child: ListTile(
                                         title: Row(
