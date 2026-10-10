@@ -1,6 +1,7 @@
 #include "my_application.h"
 
 #include <flutter_linux/flutter_linux.h>
+#include <stdlib.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
 #endif
@@ -50,6 +51,36 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
     gtk_window_set_title(window, "Gadget Editor");
+  }
+
+  {
+    const int target_frac_w = 79; // ~79% of screen width
+    const int target_frac_h = 79; // ~79% of screen height
+    int mon_w = 1280, mon_h = 720;
+    GdkDisplay* display = gtk_widget_get_display(GTK_WIDGET(window));
+    if (display != NULL) {
+      GdkMonitor* monitor = NULL;
+      int n_monitors = gdk_display_get_n_monitors(display);
+      for (int i = 0; i < n_monitors; i++) {
+        GdkMonitor* m = gdk_display_get_monitor(display, i);
+        if (gdk_monitor_is_primary(m)) {
+          monitor = m;
+          break;
+        }
+      }
+      if (monitor == NULL && n_monitors > 0) {
+        // No primary marked; fall back to the first monitor.
+        monitor = gdk_display_get_monitor(display, 0);
+      }
+      if (monitor != NULL) {
+        GdkRectangle geometry;
+        gdk_monitor_get_geometry(monitor, &geometry);
+        mon_w = geometry.width;
+        mon_h = geometry.height;
+      }
+    }
+    gtk_window_set_default_size(window, mon_w * target_frac_w / 100,
+                                mon_h * target_frac_h / 100);
   }
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
