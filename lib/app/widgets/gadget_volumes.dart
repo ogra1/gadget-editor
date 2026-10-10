@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:yaml/yaml.dart';
-import 'dart:math' as math;
-import 'package:gadget_editor/app/widgets/editable_text_field.dart';
-import 'package:yaml_edit/yaml_edit.dart';
-import 'package:file_selector/file_selector.dart';
-import 'dart:io';
-import 'package:gadget_editor/app/widgets/partition_size_editor.dart';
+
+import 'package:gadget_editor/services/gadget_yaml_service.dart';
+
+import 'editable_text_field.dart';
+import 'partition_size_editor.dart';
 
 class GadgetVolumesSection extends StatefulWidget {
   final dynamic volumes;
@@ -144,57 +143,22 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
 
   // Function to update volume name in the YAML file
   void _updateVolumeNameInFile(String filePath, String oldName, String newName) {
+    if (newName.isEmpty || newName == oldName) return;
+    final status = widget.onStatusUpdate;
+    final refresh = widget.refreshCallback;
     try {
-      // Read the existing file content
-      final file = File(filePath);
-      final content = file.readAsStringSync();
-
-      // Parse the YAML content
-      final yaml = loadYaml(content);
-
-      // Check if it's a YamlMap and has volumes
-      if (yaml is YamlMap && yaml.containsKey('volumes')) {
-        final volumes = yaml['volumes'];
-
-        // Create a new volumes map with updated volume name
-        final newVolumes = <String, dynamic>{};
-
-        // Iterate through existing volumes and update the name
-        if (volumes is YamlMap) {
-          for (var entry in volumes.entries) {
-            if (entry.key == oldName) {
-              newVolumes[newName] = entry.value;
-            } else {
-              newVolumes[entry.key] = entry.value;
-            }
-          }
-        } else if (volumes is Map<String, dynamic>) {
-          for (var entry in volumes.entries) {
-            if (entry.key == oldName) {
-              newVolumes[newName] = entry.value;
-            } else {
-              newVolumes[entry.key] = entry.value;
-            }
-          }
-        }
-
-        // Create a new YamlEditor instance to update the file
-        final editor = YamlEditor(content);
-
-        // Update the volumes section in the editor
-        editor.update(['volumes'], newVolumes);
-
-        // Write back to file
-        file.writeAsStringSync(editor.toString());
-        widget.onStatusUpdate!('Volume name updated successfully');
-        if (widget.refreshCallback != null) {
-          widget.refreshCallback!();
-        }
-      }
-
+      // renameVolume inserts the new key before removing the old one, so the
+      // volumes map is never empty mid-operation and sibling volumes (plus
+      // comments/formatting) survive the edit.
+      final yaml = GadgetYaml.fromFile(filePath);
+      yaml.renameVolume(oldName, newName);
+      yaml.save();
+      status?.call('Volume name updated successfully');
+      refresh?.call();
+    } on GadgetYamlException catch (e) {
+      status?.call('Error updating volume name: ${e.message}');
     } catch (e) {
-      // Handle error appropriately in your app
-      print('Error updating volume name: $e');
+      status?.call('Error updating volume name: $e');
     }
   }
 

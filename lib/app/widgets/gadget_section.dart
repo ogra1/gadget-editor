@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:yaml/yaml.dart';
-import 'simple_connections_editor.dart'; // Import our connection editor
 
 class GadgetSection extends StatelessWidget {
   final String title;
   final dynamic data;
   final VoidCallback? onEdit;
   final bool showEditButton;
-  final Function(dynamic, int)? onDelete; // Add delete callback
+  final Function(dynamic, Object?)? onDelete; // Add delete callback (kernel-cmdline passes [section, index])
   final int? sectionIndex; // Add section index for tracking
 
   const GadgetSection({
@@ -328,7 +327,7 @@ class GadgetSection extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.delete, size: 16),
                               onPressed: () {
-                                _showDeleteConfirmationDialog(context, 'Kernel parameter', i);
+                                _showDeleteConfirmationDialog(context, 'Kernel parameter', [group.key, i]);
                               },
                               tooltip: 'Delete parameter',
                             ),
@@ -401,10 +400,8 @@ class GadgetSection extends StatelessWidget {
                               ),
                               Expanded(
                                 child: Text(
-                                  // Handle connections that may be in combined format
-                                  connection['plug'] != null 
-                                    ? '${connection['plugSnapId'] != null && connection['plugSnapId'] != '' ? '${connection['plugSnapId']!}:' : ''}${connection['plug']}'
-                                    : 'N/A',
+                                  // Combined on-disk format: <snap id>:<interface>.
+                                  connection['plug']?.toString() ?? 'N/A',
                                   style: const TextStyle(fontFamily: 'monospace'),
                                 ),
                               ),
@@ -421,7 +418,7 @@ class GadgetSection extends StatelessWidget {
                                 ),
                                 Expanded(
                                   child: Text(
-                                    '${connection['slotSnapId'] != null && connection['slotSnapId'] != '' ? '${connection['slotSnapId']!}:' : ''}${connection['slot']}',
+                                    connection['slot'].toString(),
                                     style: const TextStyle(fontFamily: 'monospace'),
                                   ),
                                 ),
@@ -466,9 +463,10 @@ class GadgetSection extends StatelessWidget {
     if (data is YamlMap) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: data.entries.map((entry) {
-          final key = entry.key;
-          final value = entry.value;
+        children: data.entries.toList().asMap().entries.map((entryWithIndex) {
+          final key = entryWithIndex.value.key;
+          final value = entryWithIndex.value.value;
+          final entryIndex = entryWithIndex.key;
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 4),
@@ -497,7 +495,7 @@ class GadgetSection extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.delete, size: 16),
                       onPressed: () {
-                        _showDeleteConfirmationDialog(context, 'Default', 0);
+                        _showDeleteConfirmationDialog(context, 'Default', entryIndex);
                       },
                       tooltip: 'Delete default',
                     ),
@@ -605,7 +603,7 @@ class GadgetSection extends StatelessWidget {
     return Text('$value');
   }
 
-  void _showDeleteConfirmationDialog(BuildContext context, String title, int index) {
+  void _showDeleteConfirmationDialog(BuildContext context, String title, Object? index) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
