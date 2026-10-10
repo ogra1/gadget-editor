@@ -295,7 +295,7 @@ class GadgetSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${group.key.toUpperCase()}',
+                      group.key.toUpperCase(),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -442,7 +442,7 @@ class GadgetSection extends StatelessWidget {
           }).toList()
         else if (data is YamlMap)
           // If it's a map structure, handle differently
-          Text('Connection data in map format')
+          const Text('Connection data in map format')
         else
           // If it's a simple value, just display it
           Text('$data'),

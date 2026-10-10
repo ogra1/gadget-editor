@@ -498,24 +498,6 @@ connections:
     });
   });
 
-  group('removeVolume', () {
-    test('removes the volume, keeps the others', () {
-      final gadget = GadgetYaml.fromContent(
-          'volumes:\n  a:\n    x: 1\n  b:\n    y: 2\n');
-      gadget.removeVolume('a');
-      final out = gadget.toYaml();
-      expect(out, contains('b:'));
-      expect(out, isNot(contains('a:')));
-      expect(out, isNot(contains('x: 1')));
-    });
-
-    test('throws when the volume is missing', () {
-      final gadget = GadgetYaml.fromContent(fixture);
-      expect(() => gadget.removeVolume('nope'),
-          throwsA(isA<GadgetYamlException>()));
-    });
-  });
-
   group('pass-throughs', () {
     test('update creates intermediate maps', () {
       final gadget = GadgetYaml.fromContent('name: pc\n');

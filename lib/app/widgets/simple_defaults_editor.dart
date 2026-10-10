@@ -262,25 +262,26 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                     border: Border.all(color: Theme.of(context).dividerColor),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: SingleChildScrollView(
-                    child: TextFormField(
-                      controller: _multilineController,
-                      decoration: const InputDecoration(
-                        hintText: 'Paste multiline text here...',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(8),
-                      ),
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      expands: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a value';
-                        }
-                        return null;
-                      },
+                  child: TextFormField(
+                    controller: _multilineController,
+                    decoration: const InputDecoration(
+                      hintText: 'Paste multiline text here...',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.all(8),
                     ),
+                    // A fixed maxLines (not null / not expands) is what makes
+                    // the editable surface fill the fixed-height box instead of
+                    // collapsing to a single line at the top. Content beyond
+                    // the box scrolls within it.
+                    maxLines: 8,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a value';
+                      }
+                      return null;
+                    },
                   ),
                 ),
 

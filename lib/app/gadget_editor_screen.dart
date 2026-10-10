@@ -5,9 +5,6 @@ import 'package:yaml/yaml.dart';
 import 'package:path/path.dart' as path;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter_window_close/flutter_window_close.dart';
-import '../models/gadget_model.dart';
-import '../services/snap_service.dart';
-import '../services/file_service.dart';
 import 'widgets/status_bar.dart';
 import 'widgets/channel_list.dart';
 import 'widgets/sidebar_header.dart';
@@ -67,7 +64,6 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   String? snapFilePath;
 
   // Keep track of original snap name for reset functionality
-  String? _originalSnapName;
   
   // Reference to the EditableTextField for reset functionality
   EditableTextFieldState? _snapNameFieldState;
@@ -105,7 +101,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       globalTempDirectory = appDir;
       appTempDirectory = appDir.path;
       tempDirectoryPath = appDir.path;
-      print('created tempdir: $appDir.path'); 
+      debugPrint('created tempdir: $appDir.path');
     } catch (e) {
       // If temp directory creation fails, we still want to track that we tried
       // But we won't set tempDirectoryPath to null to avoid cleanup issues
@@ -132,7 +128,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         tempDir = Directory(tempDirectoryPath!);
       }
 
-      print('in cleanup function: $tempDir'); 
+      debugPrint('in cleanup function: $tempDir');
 
       // If we have a path, try to delete it
       if (tempDir != null && await tempDir.exists()) {
@@ -264,7 +260,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       } else {
         // Get the response body for better error details
         final errorBody = await response.transform(utf8.decoder).join();
-        throw Exception('Snap not found: ' + snapName);
+        throw Exception('Snap not found: $snapName ($errorBody)');
       }
     } catch (e) {
       setState(() {
@@ -364,10 +360,10 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
       setState(() {
         // Only set snapName from the actual snap.yaml file content
-        this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapNameFromFileName;
-        this.gadgetContent = content;
-        this.gadgetData = parsedData;
-        this.isAmd64Platform = false; // Local snaps are typically not amd64
+        snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapNameFromFileName;
+        gadgetContent = content;
+        gadgetData = parsedData;
+        isAmd64Platform = false; // Local snaps are typically not amd64
         loadedLocalSnapPath = filePath; // Store the original path
         gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
         snapFilePath = snapPath; // Store the snap.yaml file path
@@ -420,7 +416,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
       // Try to locate the existing extracted directory if it's already been extracted
       if (track != null && risk != null) {
-        final uniqueExtractPath = '${filePath}_extracted_${track}_${risk}';
+        final uniqueExtractPath = '${filePath}_extracted_${track}_$risk';
         final extractDir = Directory(uniqueExtractPath);
 
         // If the directory exists, read directly from it
@@ -459,13 +455,13 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
             setState(() {
               // Only set snapName from the actual snap.yaml file content
-              this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapName;
-              this.gadgetContent = content;
-              this.gadgetData = parsedData;
-              this.selectedChannel = channel;
-              this.isAmd64Platform = isAmd64; // Store the platform info
-              this.gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
-              this.snapFilePath = snapPath; // Store the snap.yaml file path
+              snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapName;
+              gadgetContent = content;
+              gadgetData = parsedData;
+              selectedChannel = channel;
+              isAmd64Platform = isAmd64; // Store the platform info
+              gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
+              snapFilePath = snapPath; // Store the snap.yaml file path
             });
 
             setState(() {
@@ -499,8 +495,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
         if (track != null && risk != null) {
           // Create unique directory name based on filename and track/risk
-          final baseFileName = path.basename(filePath);
-          uniqueExtractPath = '${filePath}_extracted_${track}_${risk}';
+          uniqueExtractPath = '${filePath}_extracted_${track}_$risk';
         } else {
           // Fallback to original naming
           uniqueExtractPath = '${filePath}_extracted';
@@ -565,13 +560,13 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
         setState(() {
           // Only set snapName from the actual snap.yaml file content
-          this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapName;
-          this.gadgetContent = content;
-          this.gadgetData = parsedData;
-          this.selectedChannel = channel;
-          this.isAmd64Platform = isAmd64; // Store the platform info
-          this.gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
-          this.snapFilePath = snapPath; // Store the snap.yaml file path
+          snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : snapName;
+          gadgetContent = content;
+          gadgetData = parsedData;
+          selectedChannel = channel;
+          isAmd64Platform = isAmd64; // Store the platform info
+          gadgetFilePath = gadgetPath; // Store the gadget.yaml file path
+          snapFilePath = snapPath; // Store the snap.yaml file path
         });
 
         setState(() {
@@ -640,9 +635,9 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
             setState(() {
               // Only set snapName from the actual snap.yaml file content
-              this.snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : 'Local Snap';
-              this.gadgetContent = content;
-              this.gadgetData = parsedData;
+              snapName = snapNameFromSnapYaml.isNotEmpty ? snapNameFromSnapYaml : 'Local Snap';
+              gadgetContent = content;
+              gadgetData = parsedData;
             });
 
             setState(() {
@@ -774,7 +769,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       final parentDir = path.dirname(gadgetDir);
       
       // Check if snap_pack exists in bin/
-      final snapPackPath = '${snapVar}/bin/snap_pack';
+      final snapPackPath = '$snapVar/bin/snap_pack';
       
       // Check if the snap_pack tool exists
       final snapPackFile = File(snapPackPath);
@@ -931,7 +926,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                     Container(
                                       margin: const EdgeInsets.symmetric(vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                                         border: Border.all(color: Theme.of(context).primaryColor),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
@@ -952,11 +947,11 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                             ),
                                           ],
                                         ),
-                                        subtitle: Column(
+                                        subtitle: const Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            const SizedBox(height: 4),
-                                            const Text(
+                                            SizedBox(height: 4),
+                                            Text(
                                               'Loaded from local file',
                                               style: TextStyle(
                                                 fontSize: 12,

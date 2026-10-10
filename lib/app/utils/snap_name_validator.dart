@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 /// Utility class for validating snap names according to snap store requirements
 class SnapNameValidator {

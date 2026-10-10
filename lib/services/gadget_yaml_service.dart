@@ -714,13 +714,6 @@ class GadgetYaml {
   }
 
   /// Removes the top-level volume [name] entirely.
-  void removeVolume(String name) {
-    if (!has(['volumes', name])) {
-      throw GadgetYamlException("No volume named '$name'");
-    }
-    _guard(() => _editor.remove(['volumes', name]));
-  }
-
   // ---------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------

@@ -38,18 +38,18 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
           borderRadius: BorderRadius.circular(8),
         ),
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Volumes',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text('No volumes defined.'),
+            SizedBox(height: 8),
+            Text('No volumes defined.'),
           ],
         ),
       );
@@ -124,18 +124,18 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
         borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.all(16),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Volumes',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text('No volumes defined. Click the edit icon to add volumes.'),
+          SizedBox(height: 8),
+          Text('No volumes defined. Click the edit icon to add volumes.'),
         ],
       ),
     );
@@ -285,7 +285,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                                     },
                                   );
                                 },
-                                child: Icon(
+                                child: const Icon(
                                   Icons.edit,
                                   size: 18, // Larger size
                                   color: Colors.white, // White color for better visibility
@@ -381,11 +381,11 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
 
   Color _adjustColorBrightness(Color color, double intensity) {
     // Create a simple brightness adjustment by modifying RGB values directly
-    int red = (color.red * intensity).round().clamp(0, 255);
-    int green = (color.green * intensity).round().clamp(0, 255);
-    int blue = (color.blue * intensity).round().clamp(0, 255);
+    int red = (color.r * 255.0 * intensity).round().clamp(0, 255);
+    int green = (color.g * 255.0 * intensity).round().clamp(0, 255);
+    int blue = (color.b * 255.0 * intensity).round().clamp(0, 255);
 
-    return Color.fromARGB(color.alpha, red, green, blue);
+    return Color.fromARGB((color.a * 255.0).round().clamp(0, 255), red, green, blue);
   }
 
   Color _getSizeBasedColor(double sizeInBytes) {

@@ -9,13 +9,13 @@ class EmptyState extends StatelessWidget {
       alignment: Alignment.topLeft, // Changed from centerLeft to topLeft
       child: Container(
         alignment: Alignment.topLeft, // Changed from centerLeft to topLeft
-        child: Column(
+        child: const Column(
           mainAxisAlignment: MainAxisAlignment.start, // Changed from center to start
           crossAxisAlignment: CrossAxisAlignment.start, // Keep left align
           children: [
-            const Icon(Icons.download_for_offline, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text(
+            Icon(Icons.download_for_offline, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
               'Search for gadget snaps from the Snap Store\nor load local gadget snaps',
               textAlign: TextAlign.left,
               style: TextStyle(fontSize: 18),

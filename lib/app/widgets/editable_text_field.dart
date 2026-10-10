@@ -81,7 +81,7 @@ class _EditableTextFieldState extends State<EditableTextField> {
               decoration: widget.decoration ??
                   InputDecoration(
                     filled: true,
-                    fillColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                    fillColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                     contentPadding: EdgeInsets.zero,
                   ),
               style: widget.style,

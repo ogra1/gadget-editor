@@ -37,7 +37,7 @@ class ChannelListItem extends StatelessWidget {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor.withOpacity(0.1),
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
           border: Border.all(color: Theme.of(context).primaryColor),
           borderRadius: BorderRadius.circular(8),
         ),
