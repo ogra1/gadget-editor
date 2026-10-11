@@ -216,6 +216,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
           'size': sizeValue,
           'role': item['role'],
           'type': item['type'],
+          'raw': item,
         });
         totalSize += sizeValue;
       }
@@ -271,74 +272,170 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
     final double size = item['size'];
     final String name = item['name'] ?? 'Unnamed';
     final bool resizable = _isResizableRole(role);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final String tooltip = _partitionTooltipText(item['raw'], size);
 
-    final Widget tile = Container(
-      height: 78,
-      margin: const EdgeInsets.all(1),
-      decoration: BoxDecoration(
-        color: _getPartitionColor(role, size),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: theme.dividerColor, width: 0.5),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                // Partition name, centered.
-                Center(
-                  child: Text(
-                    name,
-                    style: TextStyle(
-                      color: _tileTextColor(theme),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                // "Resizable" marker: kept visible (it is the only hint about
-                // which partitions can be resized) but dimmed so the whole-tile
-                // tap target reads as the affordance.
-                if (resizable)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: Icon(
-                      Icons.edit,
-                      size: 18,
-                      // 45% white: visible on the pastel fill, but clearly a
-                      // secondary marker rather than a button.
-                      color: Colors.white.withValues(alpha: 0.45),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Text(
-            _formatSize(size),
+    // The tile is sized proportionally by the caller. We measure the label
+    // against the real available width and only draw it when it fits on a
+    // single line; otherwise the tile degrades to a bare color stripe so very
+    // small partitions are not squeezed into unreadable text. The tooltip
+    // always carries the full data either way.
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double availWidth =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 0;
+
+        final TextPainter painter = TextPainter(
+          text: TextSpan(
+            text: name,
             style: TextStyle(
               color: _tileTextColor(theme),
-              fontSize: 8,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
             ),
-            textAlign: TextAlign.center,
           ),
-        ],
-      ),
-    );
+          textDirection: TextDirection.ltr,
+          textScaler: textScaler,
+        )..layout(maxWidth: double.infinity);
+        // Show the name only if its natural (unwrapped) single-line width fits
+        // the tile; otherwise render a bare color stripe (the tooltip still
+        // carries all data). Laying out with an infinite max width measures the
+        // label's true single-line width instead of letting it wrap to the tile
+        // (which would make the width check a tautology).
+        final bool fits = availWidth > 0 && painter.width <= availWidth;
 
-    if (!resizable) {
-      return tile;
+        final Container box = Container(
+          height: 78,
+          margin: const EdgeInsets.all(1),
+          decoration: BoxDecoration(
+            color: _getPartitionColor(role, size),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: theme.dividerColor, width: 0.5),
+          ),
+          child: fits
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // Partition name, centered.
+                          Center(
+                            child: Text(
+                              name,
+                              style: TextStyle(
+                                color: _tileTextColor(theme),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // "Resizable" marker: the only hint about which
+                          // partitions can be resized, dimmed so the whole
+                          // tile reads as the tap affordance.
+                          if (resizable)
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: Icon(
+                                Icons.edit,
+                                size: 18,
+                                // 45% white: visible on the pastel fill, but
+                                // clearly a secondary marker, not a button.
+                                color:
+                                    Colors.white.withValues(alpha: 0.45),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      _formatSize(size),
+                      style: TextStyle(
+                        color: _tileTextColor(theme),
+                        fontSize: 8,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                )
+              : null,
+        );
+
+        final Widget withTooltip = Tooltip(message: tooltip, child: box);
+
+        if (!resizable) {
+          return withTooltip;
+        }
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () =>
+              _showPartitionSizeEditor(context, name, size, volumeName),
+          child: withTooltip,
+        );
+      },
+    );
+  }
+
+  /// Human-readable, all-fields description of a partition, used as the
+  /// tooltip so the full data is available even when the label is hidden on a
+  /// very small (bare-stripe) tile. [raw] is the original yaml structure
+  /// entry for this partition.
+  String _partitionTooltipText(Map<dynamic, dynamic> raw, double sizeInBytes) {
+    final buffer = StringBuffer();
+    void line(String key, dynamic value) {
+      if (value == null) return;
+      final String v = value.toString();
+      if (v.isEmpty) return;
+      buffer.writeln('$key: $v');
     }
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _showPartitionSizeEditor(context, name, size, volumeName),
-      child: tile,
-    );
+    line('name', raw['name']);
+    line('role', raw['role']);
+    line('type', raw['type']);
+    if (raw['size'] != null) {
+      buffer.writeln('size: ${_formatSize(sizeInBytes)}');
+    }
+    line('offset', raw['offset']);
+    line('filesystem', raw['filesystem']);
+    line('min-size', raw['min-size']);
+    line('label', raw['label']);
+
+    final update = raw['update'];
+    if (update is Map && update.isNotEmpty) {
+      final parts = <String>[];
+      for (final e in update.entries) {
+        parts.add('${e.key} ${e.value}');
+      }
+      buffer.writeln('update: ${parts.join(', ')}');
+    }
+
+    final content = raw['content'];
+    if (content is List && content.isNotEmpty) {
+      final targets = <String>[];
+      for (final c in content) {
+        if (c is Map && c['target'] != null) {
+          targets.add(c['target'].toString());
+        }
+      }
+      if (targets.isNotEmpty) {
+        // One target per line so a long content list cannot produce a single
+        // very wide tooltip line (which could exceed the app window width).
+        buffer.writeln('content:');
+        for (final t in targets) {
+          buffer.writeln('  - $t');
+        }
+      } else {
+        buffer.writeln(
+            'content: ${content.length} entr${content.length == 1 ? "y" : "ies"}');
+      }
+    }
+
+    return buffer.toString().trimRight();
   }
 
   /// Opens the size editor for a resizable partition and refreshes the view

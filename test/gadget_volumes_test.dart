@@ -42,6 +42,41 @@ volumes:
         type: M
 ''';
 
+// The user's real-world case: a mix with a very small partition (10M) among
+// 1.2G and 5G. The 10M tile is far too narrow to show its name, so it must
+// degrade to a bare color stripe while the larger partitions keep their labels.
+const _stripeYaml = '''
+name: pc
+volumes:
+  pc2004:
+    bootloader: grub
+    structure:
+      - name: boot
+        size: 10M
+      - name: save
+        size: 1200M
+      - name: data
+        role: system-data
+        size: 5G
+''';
+
+// A partition with a multi-target content list, to verify the tooltip wraps
+// the targets one per line (no single wide comma-joined line).
+const _contentYaml = '''
+name: pc
+volumes:
+  pc2004:
+    bootloader: grub
+    structure:
+      - name: data
+        role: system-data
+        size: 5G
+        content:
+          - target: EFI/ubuntu/grubx64.efi
+          - target: EFI/ubuntu/shimx64.efi
+          - target: EFI/ubuntu/bootx64.efi
+''';
+
 void main() {
   late Directory tempDir;
 
@@ -214,6 +249,67 @@ void main() {
 
       final label = tester.widget<Text>(find.text('system-seed'));
       expect(label.style?.color, Colors.white);
+    });
+  });
+
+  group('partition tile stripe + tooltip', () {
+    testWidgets('large partitions keep their name labels', (tester) async {
+      final file = writeYaml(_stripeYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+      // Both wide partitions are wide enough to show their names.
+      expect(find.text('save'), findsOneWidget);
+      expect(find.text('data'), findsOneWidget);
+    });
+
+    testWidgets('a very small partition degrades to a bare stripe (no name)',
+        (tester) async {
+      final file = writeYaml(_stripeYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+      // The 10M "boot" tile is far too narrow to fit its name -> no label,
+      // just a thin colored stripe. The wider partitions still show names.
+      expect(find.text('boot'), findsNothing);
+      expect(find.text('save'), findsOneWidget);
+      expect(find.text('data'), findsOneWidget);
+    });
+
+    testWidgets('every partition tile carries a tooltip with its full data',
+        (tester) async {
+      final file = writeYaml(_stripeYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+
+      final messages = tester
+          .widgetList<Tooltip>(find.byType(Tooltip))
+          .map((t) => t.message)
+          .join('\n');
+
+      // One tooltip per partition, each carrying the yaml data so the info is
+      // available even for the bare-stripe (name-hidden) partitions.
+      expect(find.byType(Tooltip), findsNWidgets(3));
+      expect(messages, contains('name: boot'));
+      expect(messages, contains('name: save'));
+      expect(messages, contains('name: data'));
+      expect(messages, contains('role: system-data'));
+      expect(messages, contains('size: 5.0G'));
+    });
+
+    testWidgets('content list wraps one target per line (no single wide line)',
+        (tester) async {
+      final file = writeYaml(_contentYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+
+      final messages = tester
+          .widgetList<Tooltip>(find.byType(Tooltip))
+          .map((t) => t.message)
+          .join('\n');
+
+      // Targets are listed one per line (indented) rather than as a single
+      // comma-joined line, so a long content list cannot make the tooltip
+      // wider than the app.
+      expect(messages, contains('content:\n  - EFI/ubuntu/grubx64.efi'));
+      expect(messages, contains('  - EFI/ubuntu/shimx64.efi'));
+      expect(messages, contains('  - EFI/ubuntu/bootx64.efi'));
+      // No comma-joined single-line content form remains.
+      expect(messages, isNot(contains('content: EFI/')));
     });
   });
 }
