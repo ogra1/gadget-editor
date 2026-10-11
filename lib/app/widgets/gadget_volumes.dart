@@ -85,11 +85,10 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                       children: [
                         const Icon(Icons.storage, size: 20, color: Colors.grey),
                         const SizedBox(width: 8),
-                        SizedBox(
-                          //width: MediaQuery.of(context).size.width * 0.14,
-                          width: 200,
+                        Flexible(
                           child: EditableTextField(
                             text: volumeName,
+                            label: 'Image Name',
                             onSave: (newName) {
                               // Update the volume name in the YAML file
                               if (widget.filePath != null) {

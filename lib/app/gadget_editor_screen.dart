@@ -652,9 +652,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                   ),
                                 ),
                               ),
-                              SizedBox(
-                                //width: MediaQuery.of(context).size.width * 0.14, // 20% of available width
-                                width: 200,
+                              Flexible(
                                 child: EditableTextField(
                                   text: snapName ?? 'Unknown',
                                   onSave: (newName) {
