@@ -89,7 +89,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.storage, size: 20, color: Colors.grey),
+                        const Icon(Icons.storage, size: 20, color: Color(0xFF8E8E8E)),
                         const SizedBox(width: 8),
                         Flexible(
                           child: EditableTextField(
@@ -266,6 +266,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
     Map<String, dynamic> item,
     String volumeName,
   ) {
+    final theme = Theme.of(context);
     final role = item['role'];
     final double size = item['size'];
     final String name = item['name'] ?? 'Unnamed';
@@ -277,7 +278,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
       decoration: BoxDecoration(
         color: _getPartitionColor(role, size),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.grey.shade300, width: 0.5),
+        border: Border.all(color: theme.dividerColor, width: 0.5),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -289,8 +290,8 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                 Center(
                   child: Text(
                     name,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: _tileTextColor(theme),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -319,8 +320,8 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
           ),
           Text(
             _formatSize(size),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: _tileTextColor(theme),
               fontSize: 8,
             ),
             textAlign: TextAlign.center,
@@ -384,6 +385,14 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
       },
     );
   }
+
+  /// Text color for a partition tile: white on dark pastel fills, dark text
+  /// on light pastel fills, so the label stays legible in both light and dark
+  /// mode regardless of the role color.
+  Color _tileTextColor(ThemeData theme) =>
+      (theme.brightness == Brightness.dark)
+          ? Colors.white
+          : const Color(0xFF262626);
 
   double _parseSize(dynamic size) {
     if (size == null) return 0;

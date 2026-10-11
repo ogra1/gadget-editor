@@ -33,7 +33,7 @@ class StatusBar extends StatelessWidget {
             message,
             style: const TextStyle(
               fontSize: 14,
-              color: Colors.grey,
+              color: Color(0xFF8E8E8E),
             ),
           ),
           SizedBox(
@@ -59,7 +59,7 @@ class StatusBar extends StatelessWidget {
                 ),
                 elevation: 0,
                 disabledBackgroundColor: Theme.of(context).disabledColor,
-                disabledForegroundColor: Colors.grey,
+                disabledForegroundColor: const Color(0xFF8E8E8E),
               ),
               child: const Text('Pack Snap'),
             ),

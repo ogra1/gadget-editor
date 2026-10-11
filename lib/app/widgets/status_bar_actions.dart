@@ -35,7 +35,7 @@ class StatusBarActions extends StatelessWidget {
           ),
           elevation: 0,
           disabledBackgroundColor: Theme.of(context).disabledColor,
-          disabledForegroundColor: Colors.grey,
+          disabledForegroundColor: const Color(0xFF8E8E8E),
         ),
         child: const Text('Action'),
       ),

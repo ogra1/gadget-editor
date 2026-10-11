@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:yaru/yaru.dart';
 import 'package:path/path.dart' as path;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter_window_close/flutter_window_close.dart';
@@ -595,10 +596,10 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                       child: ListTile(
                                         title: Row(
                                           children: [
-                                            const Icon(
+                                            Icon(
                                               Icons.check_circle,
                                               size: 16,
-                                              color: Colors.green,
+                                              color: Theme.of(context).colorScheme.success,
                                             ),
                                             const SizedBox(width: 8),
                                             Expanded(
@@ -613,11 +614,11 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             const SizedBox(height: 4),
-                                            const Text(
+                                            Text(
                                               'Loaded from local file',
                                               style: TextStyle(
                                                 fontSize: 12,
-                                                color: Colors.green,
+                                                color: Theme.of(context).colorScheme.success,
                                               ),
                                             ),
                                             if (snapVersion != null)
