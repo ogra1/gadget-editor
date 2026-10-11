@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:yaml/yaml.dart';
 
@@ -285,11 +287,17 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
         final double availWidth =
             constraints.maxWidth.isFinite ? constraints.maxWidth : 0;
 
+        // Text color is derived from the fill's own luminance (theme-
+        // independent) so labels stay readable on both dark and light fills
+        // in either app theme.
+        final Color fill = _getPartitionColor(role, size);
+        final Color textColor = _tileTextColor(fill);
+
         final TextPainter painter = TextPainter(
           text: TextSpan(
             text: name,
             style: TextStyle(
-              color: _tileTextColor(theme),
+              color: textColor,
               fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
@@ -308,7 +316,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
           height: 78,
           margin: const EdgeInsets.all(1),
           decoration: BoxDecoration(
-            color: _getPartitionColor(role, size),
+            color: fill,
             borderRadius: BorderRadius.circular(4),
             border: Border.all(color: theme.dividerColor, width: 0.5),
           ),
@@ -324,7 +332,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                             child: Text(
                               name,
                               style: TextStyle(
-                                color: _tileTextColor(theme),
+                                color: textColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -343,10 +351,10 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                               child: Icon(
                                 Icons.edit,
                                 size: 18,
-                                // 45% white: visible on the pastel fill, but
-                                // clearly a secondary marker, not a button.
-                                color:
-                                    Colors.white.withValues(alpha: 0.45),
+                                // 45% of the (luminance-derived) text color:
+                                // visible on the fill, but clearly a secondary
+                                // marker, not a button.
+                                color: textColor.withValues(alpha: 0.45),
                               ),
                             ),
                         ],
@@ -355,7 +363,7 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                     Text(
                       _formatSize(size),
                       style: TextStyle(
-                        color: _tileTextColor(theme),
+                        color: textColor,
                         fontSize: 8,
                       ),
                       textAlign: TextAlign.center,
@@ -486,10 +494,38 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
   /// Text color for a partition tile: white on dark pastel fills, dark text
   /// on light pastel fills, so the label stays legible in both light and dark
   /// mode regardless of the role color.
-  Color _tileTextColor(ThemeData theme) =>
-      (theme.brightness == Brightness.dark)
-          ? Colors.white
-          : const Color(0xFF262626);
+  /// Picks a readable text color for a partition tile based on the
+  /// LUMINANCE OF THE FILL ITSELF, not the app theme. The partition fills are
+  /// fixed pastel/strong-blue constants that do not change with light/dark
+  /// theme, so keying the text color off the theme made a dark fill (e.g. the
+  /// dark blue used for large partitions) render near-black text on a dark
+  /// background in light mode - nearly unreadable. Deriving the color from the
+  /// fill's own luminance keeps the text readable in both themes.
+  static Color _tileTextColor(Color fill) =>
+      _relativeLuminance(fill) > _kTextLuminanceThreshold
+          ? const Color(0xFF1C1C1C) // near-black for light fills
+          : Colors.white; // white for dark fills
+
+  /// WCAG 2.x relative luminance of [color] (0 = black, 1 = white).
+  ///
+  /// Implemented directly (rather than via `Color.computeLuminance` / the
+  /// older `Color.luminance` getter) so the threshold logic is explicit,
+  /// portable across Flutter versions, and matches the engine's sRGB
+  /// linearization.
+  static double _relativeLuminance(Color color) {
+    double linear(double c) =>
+        c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
+
+    return 0.2126 * linear(color.r) +
+        0.7152 * linear(color.g) +
+        0.0722 * linear(color.b);
+  }
+
+  /// Luminance threshold: fills brighter than this take dark text, darker
+  /// fills take white text. 0.179 is the conventional midpoint that keeps the
+  /// strongest blue fill (#1976D2, L\u22480.15) and the purple fills on the
+  /// correct side of the line with comfortable margin.
+  static const double _kTextLuminanceThreshold = 0.179;
 
   double _parseSize(dynamic size) {
     if (size == null) return 0;

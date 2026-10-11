@@ -77,6 +77,21 @@ volumes:
           - target: EFI/ubuntu/bootx64.efi
 ''';
 
+// One large (1G -> dark blue #1976D2 fill) and one small (512M -> pastel
+// #90CAF9 fill) partition, to check that the tile text color is chosen from
+// the fill's own luminance: white on the dark fill, dark on the light fill.
+const _luminanceYaml = '''
+name: pc
+volumes:
+  pc2004:
+    bootloader: grub
+    structure:
+      - name: large
+        size: 1G
+      - name: small
+        size: 512M
+''';
+
 void main() {
   late Directory tempDir;
 
@@ -229,29 +244,6 @@ void main() {
     expect(find.byType(PartitionSizeEditor), findsNothing);
   });
 
-  group('partition tile theming', () {
-    testWidgets('label uses dark legible text on a light tile (not white)',
-        (tester) async {
-      final file = writeYaml(_volYaml);
-      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
-
-      final label = tester.widget<Text>(find.text('system-seed'));
-      final color = label.style?.color;
-      expect(color, isNotNull);
-      expect(color, isNot(Colors.white));
-      expect(color!.computeLuminance(), lessThan(0.5));
-    });
-
-    testWidgets('label is white on a dark tile', (tester) async {
-      final file = writeYaml(_volYaml);
-      await pumpSection(
-          tester, filePath: file.path, statuses: <String>[], dark: true);
-
-      final label = tester.widget<Text>(find.text('system-seed'));
-      expect(label.style?.color, Colors.white);
-    });
-  });
-
   group('partition tile stripe + tooltip', () {
     testWidgets('large partitions keep their name labels', (tester) async {
       final file = writeYaml(_stripeYaml);
@@ -310,6 +302,41 @@ void main() {
       expect(messages, contains('  - EFI/ubuntu/bootx64.efi'));
       // No comma-joined single-line content form remains.
       expect(messages, isNot(contains('content: EFI/')));
+    });
+  });
+
+  group('partition tile text color follows fill luminance', () {
+    Color textColorOf(WidgetTester tester, String label) {
+      final t = tester.widget<Text>(find.text(label));
+      final color = t.style?.color;
+      expect(color, isA<Color>());
+      return color as Color;
+    }
+
+    testWidgets('dark fill gets white text, light fill gets dark text',
+        (tester) async {
+      final file = writeYaml(_luminanceYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+
+      // 1G partition -> large size -> dark blue #1976D2 fill (luminance
+      // ~0.15) -> white text.
+      expect(textColorOf(tester, 'large'), Colors.white);
+      // 512M partition -> small size -> pastel #90CAF9 fill -> near-black
+      // text (dark, but not pure black).
+      final smallColor = textColorOf(tester, 'small');
+      expect(smallColor, const Color(0xFF1C1C1C));
+    });
+
+    testWidgets('switching to the dark theme does not change the text colors',
+        (tester) async {
+      final file = writeYaml(_luminanceYaml);
+      // The text color is keyed off the fill, not the app theme, so a dark
+      // theme must produce exactly the same colors as light mode.
+      await pumpSection(tester, filePath: file.path, statuses: <String>[],
+          dark: true);
+
+      expect(textColorOf(tester, 'large'), Colors.white);
+      expect(textColorOf(tester, 'small'), const Color(0xFF1C1C1C));
     });
   });
 }
