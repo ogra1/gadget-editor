@@ -63,10 +63,12 @@ void main() {
     WidgetTester tester, {
     required String filePath,
     required List<String> statuses,
+    bool dark = false,
   }) async {
     final doc = loadYaml(File(filePath).readAsStringSync());
     final volumes = (doc is YamlMap) ? doc['volumes'] : null;
     await tester.pumpWidget(MaterialApp(
+      theme: dark ? ThemeData.dark() : ThemeData.light(),
       home: Scaffold(
         body: GadgetVolumesSection(
           volumes: volumes,
@@ -190,5 +192,28 @@ void main() {
     await tester.tap(find.text('system-boot'));
     await tester.pumpAndSettle();
     expect(find.byType(PartitionSizeEditor), findsNothing);
+  });
+
+  group('partition tile theming', () {
+    testWidgets('label uses dark legible text on a light tile (not white)',
+        (tester) async {
+      final file = writeYaml(_volYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+
+      final label = tester.widget<Text>(find.text('system-seed'));
+      final color = label.style?.color;
+      expect(color, isNotNull);
+      expect(color, isNot(Colors.white));
+      expect(color!.computeLuminance(), lessThan(0.5));
+    });
+
+    testWidgets('label is white on a dark tile', (tester) async {
+      final file = writeYaml(_volYaml);
+      await pumpSection(
+          tester, filePath: file.path, statuses: <String>[], dark: true);
+
+      final label = tester.widget<Text>(find.text('system-seed'));
+      expect(label.style?.color, Colors.white);
+    });
   });
 }

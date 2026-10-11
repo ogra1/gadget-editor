@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gadget_editor/app/widgets/channel_list.dart';
+import 'package:yaru/yaru.dart';
 
 Map<String, dynamic> _channel(
     String track, String risk, String arch, int revision) {
@@ -116,6 +117,47 @@ void main() {
       await tester.tap(find.byIcon(Icons.download_for_offline).first);
       await tester.pump();
       expect(tapped, isFalse);
+    });
+  });
+
+  group('theming', () {
+    final selectedChannels = [
+      _channel('26', 'stable', 'amd64', 10),
+    ];
+
+    Future<void> pumpSelected(WidgetTester tester, {ThemeData? theme}) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: SizedBox(
+            width: 300,
+            height: 600,
+            child: ChannelList(
+              channels: selectedChannels,
+              onChannelSelected: (c) {},
+              selectedChannel: selectedChannels[0],
+              isDownloading: false,
+            ),
+          ),
+        ),
+      ));
+    }
+
+    testWidgets(
+        'selected label and check use the theme success color, not raw green',
+        (tester) async {
+      await pumpSelected(tester);
+
+      final ctx = tester.element(find.text('Currently Selected'));
+      final success = Theme.of(ctx).colorScheme.success;
+
+      final label = tester.widget<Text>(find.text('Currently Selected'));
+      expect(label.style?.color, success);
+      expect(label.style?.color, isNot(Colors.green));
+
+      final check = tester.widget<Icon>(find.byIcon(Icons.check_circle));
+      expect(check.color, success);
+      expect(check.color, isNot(Colors.green));
     });
   });
 }
