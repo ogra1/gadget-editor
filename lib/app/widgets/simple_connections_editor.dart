@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:gadget_editor/services/gadget_yaml_service.dart';
+import 'package:gadget_editor/services/snap_lookup_service.dart';
+import 'snap_id_field.dart';
 
 class SimpleConnectionsEditor extends StatefulWidget {
   /// The raw `connections` node as currently rendered by the display.
@@ -14,6 +16,10 @@ class SimpleConnectionsEditor extends StatefulWidget {
   final Function() onCancel;
   final Function(String) onStatusUpdate;
 
+  /// Resolver for the snap-ID fields. Defaults to the live store service;
+  /// tests inject a fake so they stay hermetic.
+  final SnapLookupService? lookupService;
+
   const SimpleConnectionsEditor({
     super.key,
     required this.connections,
@@ -21,6 +27,7 @@ class SimpleConnectionsEditor extends StatefulWidget {
     required this.onSave,
     required this.onCancel,
     required this.onStatusUpdate,
+    this.lookupService,
   });
 
   @override
@@ -35,6 +42,11 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
   final _plugController = TextEditingController();
   final _slotSnapIdController = TextEditingController();
   final _slotController = TextEditingController();
+
+  /// Smart snap-ID fields: they resolve a typed snap name to its store ID
+  /// in place, and let the save path await any in-flight lookup.
+  final GlobalKey<SnapIdFieldState> _plugSnapIdFieldKey = GlobalKey();
+  final GlobalKey<SnapIdFieldState> _slotSnapIdFieldKey = GlobalKey();
 
   @override
   void dispose() {
@@ -104,16 +116,22 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
   /// Saves the entered connection through the service, which appends the
   /// single entry to the top-level `connections` list (creating the section
   /// on demand) and touches nothing else in the document.
-  void _saveChangesToYaml() {
+  ///
+  /// Resolving snap names to IDs is awaited first: when the user typed a
+  /// store name, the field already holds its ID; when it could not be
+  /// resolved, the raw text is persisted as-is (manual ID fallback).
+  Future<void> _saveChangesToYaml() async {
     if (widget.filePath == null) {
       widget.onStatusUpdate('Error: No file path provided');
       return;
     }
 
-    // Get form values
-    final plugSnapId = _plugSnapIdController.text.trim();
+    // Get form values (awaiting any in-flight name -> ID resolution).
+    final plugSnapId =
+        await _plugSnapIdFieldKey.currentState!.resolveForSave();
     final plug = _plugController.text.trim();
-    final slotSnapId = _slotSnapIdController.text.trim();
+    final slotSnapId =
+        await _slotSnapIdFieldKey.currentState!.resolveForSave();
     final slot = _slotController.text.trim();
 
     // Validate inputs
@@ -193,9 +211,10 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
                       children: [
                         Expanded(
                           flex: 5, // more space to snap ID
-                          child: TextFormField(
+                          child: SnapIdField(
+                            key: _plugSnapIdFieldKey,
                             controller: _plugSnapIdController,
-                            decoration: const InputDecoration(labelText: 'Snap ID'),
+                            lookupService: widget.lookupService,
                             validator: (value) {
                               if (value != null &&
                                   value.isNotEmpty &&
@@ -244,9 +263,10 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
                       children: [
                         Expanded(
                           flex: 5, // more space to snap ID
-                          child: TextFormField(
+                          child: SnapIdField(
+                            key: _slotSnapIdFieldKey,
                             controller: _slotSnapIdController,
-                            decoration: const InputDecoration(labelText: 'Snap ID'),
+                            lookupService: widget.lookupService,
                             validator: (value) {
                               if (value != null &&
                                   value.isNotEmpty &&

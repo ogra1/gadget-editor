@@ -101,11 +101,20 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    if (volumeData['structure'] != null && volumeData['structure'] is List) 
-                      _buildPartitionVisualization(context, volumeData['structure'], volumeName) 
-                    else if (volumeData['structure'] == null) 
-                      const Text('No structure field found') 
-                    else 
+                    // Caption mirroring the "Image Name" caption above.
+                    Text(
+                      'Partitions',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (volumeData['structure'] != null && volumeData['structure'] is List)
+                      _buildPartitionVisualization(context, volumeData['structure'], volumeName)
+                    else if (volumeData['structure'] == null)
+                      const Text('No structure field found')
+                    else
                       const Text('Structure is not a list'),
                     const SizedBox(height: 16),
                   ],

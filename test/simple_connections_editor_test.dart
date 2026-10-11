@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaml/yaml.dart';
 
 import 'package:gadget_editor/app/widgets/simple_connections_editor.dart';
+import 'package:gadget_editor/services/snap_lookup_service.dart';
+import 'helpers/lookup_fakes.dart';
 
 /// Pumps the editor inside a minimal [MaterialApp] so [Form]/[Navigator]
 /// work, and returns the scaffolded app. The editor is add-only, so the
@@ -17,6 +19,7 @@ Future<void> pumpEditor(
   required Function(dynamic) onSave,
   Function() onCancel = _noopCancel,
   Function(String)? onStatusUpdate,
+  SnapLookupService? lookupService,
 }) {
   final captured = <String>[];
   return tester.pumpWidget(MaterialApp(
@@ -27,6 +30,8 @@ Future<void> pumpEditor(
         onSave: onSave,
         onCancel: onCancel,
         onStatusUpdate: onStatusUpdate ?? (m) => captured.add(m),
+        // Hermetic: no real store HTTP from the resolver in tests.
+        lookupService: lookupService ?? NoopLookupService(),
       ),
     ),
   ));

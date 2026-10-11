@@ -11,6 +11,7 @@ class ExtractedGadget {
     required this.data,
     this.snapPath,
     this.snapNameFromYaml = '',
+    this.architectures = const [],
   });
 
   /// Directory containing the `meta/` of the unpacked snap.
@@ -30,6 +31,11 @@ class ExtractedGadget {
 
   /// The `name` from `meta/snap.yaml` (empty when missing).
   final String snapNameFromYaml;
+
+  /// The `architectures` from `meta/snap.yaml`: the single source of truth
+  /// for which architectures this snap targets (`all` means any). Empty when
+  /// `meta/snap.yaml` is absent or the field is missing.
+  final List<String> architectures;
 }
 
 /// Exception thrown when a snap cannot be extracted or its metadata cannot
@@ -59,14 +65,6 @@ class SnapFileService {
     return '${snapFilePath}_extracted';
   }
 
-  /// Whether [channel] (a store channel map) targets the amd64
-  /// architecture.
-  static bool isAmd64Arch(Map<String, dynamic> channel) {
-    final channelInfo = channel['channel'];
-    final architecture =
-        channelInfo is Map ? channelInfo['architecture'] : null;
-    return architecture?.toString().toLowerCase() == 'amd64';
-  }
 
   /// Unpacks the snap at [snapPath] into [extractPath] (replacing any
   /// previous extraction) and returns the parsed metadata.
@@ -105,9 +103,13 @@ class SnapFileService {
     final data = _parseYaml(content);
 
     String snapNameFromYaml = '';
+    final List<String> architectures = [];
     final snapData = loadYaml(await File(metaSnapPath).readAsString());
-    if (snapData is YamlMap && snapData.containsKey('name')) {
-      snapNameFromYaml = snapData['name'] as String;
+    if (snapData is YamlMap) {
+      if (snapData.containsKey('name')) {
+        snapNameFromYaml = snapData['name'] as String;
+      }
+      architectures.addAll(_parseArchitectures(snapData));
     }
 
     return ExtractedGadget(
@@ -117,6 +119,7 @@ class SnapFileService {
       content: content,
       data: data,
       snapNameFromYaml: snapNameFromYaml,
+      architectures: architectures,
     );
   }
 
@@ -134,12 +137,16 @@ class SnapFileService {
 
     String? snapPath;
     String snapNameFromYaml = '';
+    final List<String> architectures = [];
     final metaSnapPath = '$extractPath/meta/snap.yaml';
     if (await File(metaSnapPath).exists()) {
       snapPath = metaSnapPath;
       final snapData = loadYaml(await File(metaSnapPath).readAsString());
-      if (snapData is YamlMap && snapData.containsKey('name')) {
-        snapNameFromYaml = snapData['name'] as String;
+      if (snapData is YamlMap) {
+        if (snapData.containsKey('name')) {
+          snapNameFromYaml = snapData['name'] as String;
+        }
+        architectures.addAll(_parseArchitectures(snapData));
       }
     }
 
@@ -150,7 +157,23 @@ class SnapFileService {
       content: content,
       data: data,
       snapNameFromYaml: snapNameFromYaml,
+      architectures: architectures,
     );
+  }
+
+  /// Reads the mandatory `architectures` field of a parsed `meta/snap.yaml`
+  /// map, tolerating the list form (`architectures: [amd64, arm64]`, block
+  /// and flow) as well as the all-architecture wildcard
+  /// (`architectures: all`).
+  static List<String> _parseArchitectures(Map snapData) {
+    final raw = snapData['architectures'];
+    if (raw is List) {
+      return raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    }
+    if (raw is String && raw.isNotEmpty) {
+      return [raw];
+    }
+    return const [];
   }
 
   static Map<String, dynamic> _parseYaml(String content) {

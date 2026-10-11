@@ -12,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:yaml/yaml.dart';
 
 import 'package:gadget_editor/app/widgets/simple_defaults_editor.dart';
+import 'package:gadget_editor/services/snap_lookup_service.dart';
+import 'helpers/lookup_fakes.dart';
 
 /// A valid 32-character snap ID (the editor accepts 32-char IDs or "system").
 const String k32 = 'aabbccddeeff00112233445566778899';
@@ -24,6 +26,7 @@ Future<void> pumpEditor(
   required Function(dynamic) onSave,
   Function() onCancel = _noopCancel,
   required Function(String) onStatusUpdate,
+  SnapLookupService? lookupService,
 }) {
   return tester.pumpWidget(MaterialApp(
     home: Scaffold(
@@ -33,6 +36,8 @@ Future<void> pumpEditor(
         onSave: onSave,
         onCancel: onCancel,
         onStatusUpdate: onStatusUpdate,
+        // Hermetic: no real store HTTP from the resolver in tests.
+        lookupService: lookupService ?? NoopLookupService(),
       ),
     ),
   ));

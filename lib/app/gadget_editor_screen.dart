@@ -15,6 +15,7 @@ import 'widgets/editable_text_field.dart';
 import '../services/snap_store_service.dart';
 import '../services/snap_file_service.dart';
 import '../services/snap_pack_service.dart';
+import '../app/widgets/arch_badge.dart';
 import 'utils/snap_name_validator.dart';
 
 // Global variable to store the temp directory path
@@ -59,7 +60,9 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   // Store the path of the loaded local snap
   String? loadedLocalSnapPath;
   // Store platform information
-  bool isAmd64Platform = true; // Default to amd64
+  // Architectures of the loaded gadget snap, taken from meta/snap.yaml
+  // (the single source of truth for both store-downloaded and local snaps).
+  List<String> snapArchitectures = const [];
   // Store the file path for saving changes
   String? gadgetFilePath;
   // Store the snap.yaml file path for saving snap name
@@ -222,7 +225,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
             : snapNameFromFileName;
         gadgetContent = extracted.content;
         gadgetData = extracted.data;
-        isAmd64Platform = false; // Local snaps are typically not amd64
+        snapArchitectures = extracted.architectures;
         loadedLocalSnapPath = filePath; // Store the original path
         gadgetFilePath = extracted.gadgetPath; // meta/gadget.yaml
         snapFilePath = extracted.snapPath; // meta/snap.yaml
@@ -285,7 +288,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
           gadgetContent = extracted.content;
           gadgetData = extracted.data;
           selectedChannel = channel;
-          isAmd64Platform = SnapFileService.isAmd64Arch(channel);
+          snapArchitectures = extracted.architectures;
           gadgetFilePath = extracted.gadgetPath;
           snapFilePath = extracted.snapPath;
           statusMessage = 'Gadget parsed successfully (cached)';
@@ -305,7 +308,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         gadgetContent = extracted.content;
         gadgetData = extracted.data;
         selectedChannel = channel;
-        isAmd64Platform = SnapFileService.isAmd64Arch(channel);
+        snapArchitectures = extracted.architectures;
         gadgetFilePath = extracted.gadgetPath;
         snapFilePath = extracted.snapPath;
         statusMessage = 'Gadget parsed successfully';
@@ -666,6 +669,13 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                   },
                                 ),
                               ),
+                              // Which architecture the loaded snap targets.
+                              if (snapArchitectures.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: ArchBadge(
+                                      architectures: snapArchitectures),
+                                ),
                             ],
                           )
                         else
@@ -680,7 +690,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                           Expanded(
                             child: GadgetContent(
                               content: gadgetContent,
-                              isAmd64: isAmd64Platform,
+                              isAmd64: snapArchitectures.contains('amd64'),
                               filePath: gadgetFilePath,
                               onContentChanged: (newContent) {
                                 // When content changes, update the state

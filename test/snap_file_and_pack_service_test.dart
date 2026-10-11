@@ -192,25 +192,56 @@ void main() {
     });
   });
 
-  group('SnapFileService.isAmd64Arch', () {
-    test('detects amd64 case-insensitively', () {
-      expect(
-        SnapFileService.isAmd64Arch(
-            {'channel': {'architecture': 'amd64'}}),
-        isTrue);
-      expect(
-        SnapFileService.isAmd64Arch(
-            {'channel': {'architecture': 'AMD64'}}),
-        isTrue);
+  group('ExtractedGadget.architectures (meta/snap.yaml)', () {
+    /// Writes an unpacked snap dir whose snap.yaml carries [archYaml].
+    Future<String> unpackedWithArch(Directory parent, String archYaml) async {
+      final snapDir = await Directory('${parent.path}/unpacked').create();
+      await Directory('${snapDir.path}/meta').create();
+      await File('${snapDir.path}/meta/gadget.yaml').writeAsString(_gadgetYaml);
+      await File('${snapDir.path}/meta/snap.yaml')
+          .writeAsString('name: pc\n$archYaml\n');
+      return snapDir.path;
+    }
+
+    test('parses the list form of architectures', () async {
+      final dir = await Directory.systemTemp.createTemp('arch_test.');
+      final snapDir =
+          await unpackedWithArch(dir, 'architectures: [amd64, arm64]');
+      final extracted = await SnapFileService().readExtracted(snapDir);
+      expect(extracted.architectures, ['amd64', 'arm64']);
     });
 
-    test('returns false for other architectures or missing channel', () {
-      expect(
-          SnapFileService.isAmd64Arch(
-              {'channel': {'architecture': 'arm64'}}),
-          isFalse);
-      expect(SnapFileService.isAmd64Arch({}), isFalse);
-      expect(SnapFileService.isAmd64Arch({'channel': {}}), isFalse);
+    test('parses the block form of architectures', () async {
+      final dir = await Directory.systemTemp.createTemp('arch_test.');
+      final snapDir = await unpackedWithArch(
+          dir, 'architectures:\n  - amd64\n  - arm64');
+      final extracted = await SnapFileService().readExtracted(snapDir);
+      expect(extracted.architectures, ['amd64', 'arm64']);
+    });
+
+    test('parses the all-architecture wildcard', () async {
+      final dir = await Directory.systemTemp.createTemp('arch_test.');
+      final snapDir = await unpackedWithArch(dir, 'architectures: all');
+      final extracted = await SnapFileService().readExtracted(snapDir);
+      expect(extracted.architectures, ['all']);
+    });
+
+    test('is empty when the field is missing', () async {
+      final dir = await Directory.systemTemp.createTemp('arch_test.');
+      final snapDir = await unpackedWithArch(dir, 'version: 1.0');
+      final extracted = await SnapFileService().readExtracted(snapDir);
+      expect(extracted.architectures, isEmpty);
+    });
+
+    test('extractSnap surfaces architectures from a real snap file', () async {
+      final dir = await Directory.systemTemp.createTemp('arch_test.');
+      final snapPath = await _makeRealSnap(dir);
+      final extracted =
+          await SnapFileService().extractSnap(snapPath, '${dir.path}/out');
+      // _snapYaml carries no architectures field, so the list must be empty
+      // while the name is still surfaced.
+      expect(extracted.architectures, isEmpty);
+      expect(extracted.snapNameFromYaml, 'pc');
     });
   });
 

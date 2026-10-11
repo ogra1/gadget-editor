@@ -3,6 +3,8 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 
 import 'package:gadget_editor/services/gadget_yaml_service.dart';
+import 'package:gadget_editor/services/snap_lookup_service.dart';
+import 'snap_id_field.dart';
 
 class SimpleDefaultsEditor extends StatefulWidget {
   final dynamic defaults;
@@ -11,6 +13,10 @@ class SimpleDefaultsEditor extends StatefulWidget {
   final Function() onCancel;
   final Function(String) onStatusUpdate;
 
+  /// Resolver for the snap-ID field. Defaults to the live store service;
+  /// tests inject a fake so they stay hermetic.
+  final SnapLookupService? lookupService;
+
   const SimpleDefaultsEditor({
     super.key,
     required this.defaults,
@@ -18,6 +24,7 @@ class SimpleDefaultsEditor extends StatefulWidget {
     required this.onSave,
     required this.onCancel,
     required this.onStatusUpdate,
+    this.lookupService,
   });
 
   @override
@@ -30,6 +37,10 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
   // Form fields
   final _snapIdController = TextEditingController();
   final _keyController = TextEditingController();
+
+  /// Smart snap-ID field: resolves a typed snap name to its store ID in
+  /// place; the save path awaits any in-flight lookup.
+  final GlobalKey<SnapIdFieldState> _snapIdFieldKey = GlobalKey();
   final _valueController = TextEditingController();
   bool _isMultilineExpanded = false;
   final _multilineController = TextEditingController();
@@ -78,14 +89,15 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
   /// Saves the entered default through the service, which writes only the
   /// single leaf (creating the nesting it needs); comments and everything
   /// else in the document survive.
-  void _saveChangesToYaml() {
+  Future<void> _saveChangesToYaml() async {
     if (widget.filePath == null) {
       widget.onStatusUpdate('Error: No file path provided');
       return;
     }
 
-    // Get the snap ID and key from the form
-    final snapId = _snapIdController.text.trim();
+    // Get the snap ID and key from the form (awaiting any in-flight name ->
+    // ID resolution; an unresolvable name is kept as-is for manual IDs).
+    final snapId = await _snapIdFieldKey.currentState!.resolveForSave();
     final key = _keyController.text.trim();
 
     // Get the value - use multiline controller if expanded, otherwise regular controller
@@ -159,9 +171,10 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                   const SizedBox(width: 100, child: Text('Snap:')),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: TextFormField(
+                    child: SnapIdField(
+                      key: _snapIdFieldKey,
                       controller: _snapIdController,
-                      decoration: const InputDecoration(labelText: 'Snap ID'),
+                      lookupService: widget.lookupService,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a snap ID';
