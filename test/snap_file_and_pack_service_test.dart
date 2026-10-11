@@ -115,6 +115,7 @@ void main() {
       expect(extracted.gadgetPath, '${tmp.path}/out/meta/gadget.yaml');
       expect(extracted.snapPath, '${tmp.path}/out/meta/snap.yaml');
       expect(extracted.snapNameFromYaml, 'pc');
+      expect(extracted.version, '26.04');
       expect(extracted.data['volumes'], isA<Map>());
       expect(extracted.data['volumes']['pc']['bootloader'], 'uboot');
       expect(extracted.content, contains('bootloader: uboot'));
@@ -150,6 +151,7 @@ void main() {
       final extracted = await service.readExtracted(snapDir);
 
       expect(extracted.snapNameFromYaml, 'pc');
+      expect(extracted.version, '26.04');
       expect(extracted.data['defaults']['core26']['CORE20_PC_VERSION'], 26);
       expect(extracted.gadgetPath, '$snapDir/meta/gadget.yaml');
     });
@@ -162,6 +164,7 @@ void main() {
       final extracted = await service.readExtracted(snapDir);
 
       expect(extracted.snapNameFromYaml, '');
+      expect(extracted.version, isEmpty);
       expect(extracted.snapPath, isNull);
       expect(extracted.data['volumes'], isA<Map>());
     });
@@ -346,6 +349,48 @@ void main() {
       }
       expect(missing, isNotNull);
       expect(missing!.message, contains('gadget.yaml not found'));
+    });
+  });
+
+  group('ExtractedGadget.version (meta/snap.yaml)', () {
+    /// Writes an unpacked snap dir whose snap.yaml carries [versionYaml].
+    Future<String> unpackedWithVersion(Directory parent, String versionYaml) async {
+      final snapDir = await Directory('${parent.path}/unpacked').create();
+      await Directory('${snapDir.path}/meta').create();
+      await File('${snapDir.path}/meta/gadget.yaml').writeAsString(_gadgetYaml);
+      await File('${snapDir.path}/meta/snap.yaml')
+          .writeAsString('name: pc\n$versionYaml\n');
+      return snapDir.path;
+    }
+
+    test('parses a quoted version string', () async {
+      final dir = await Directory.systemTemp.createTemp('version_test.');
+      final snapDir = await unpackedWithVersion(dir, 'version: "1.2.3"');
+      final extracted = await SnapFileService().readExtracted(snapDir);
+      expect(extracted.version, '1.2.3');
+    });
+
+    test('parses an unquoted version', () async {
+      final dir = await Directory.systemTemp.createTemp('version_test.');
+      final snapDir = await unpackedWithVersion(dir, 'version: 26.04');
+      final extracted = await SnapFileService().readExtracted(snapDir);
+      expect(extracted.version, '26.04');
+    });
+
+    test('is empty when the field is missing', () async {
+      final dir = await Directory.systemTemp.createTemp('version_test.');
+      final snapDir =
+          await unpackedWithVersion(dir, 'architectures: [amd64]');
+      final extracted = await SnapFileService().readExtracted(snapDir);
+      expect(extracted.version, isEmpty);
+    });
+
+    test('extractSnap surfaces the version from a real snap file', () async {
+      final dir = await Directory.systemTemp.createTemp('version_test.');
+      final snapPath = await _makeRealSnap(dir);
+      final extracted =
+          await SnapFileService().extractSnap(snapPath, '${dir.path}/out');
+      expect(extracted.version, '26.04');
     });
   });
 }

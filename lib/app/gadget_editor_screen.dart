@@ -63,6 +63,9 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   // Architectures of the loaded gadget snap, taken from meta/snap.yaml
   // (the single source of truth for both store-downloaded and local snaps).
   List<String> snapArchitectures = const [];
+  // Version of the loaded gadget snap from meta/snap.yaml (null when snap.yaml
+  // has no version field).
+  String? snapVersion;
   // Store the file path for saving changes
   String? gadgetFilePath;
   // Store the snap.yaml file path for saving snap name
@@ -226,6 +229,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         gadgetContent = extracted.content;
         gadgetData = extracted.data;
         snapArchitectures = extracted.architectures;
+        snapVersion = extracted.version.isEmpty ? null : extracted.version;
         loadedLocalSnapPath = filePath; // Store the original path
         gadgetFilePath = extracted.gadgetPath; // meta/gadget.yaml
         snapFilePath = extracted.snapPath; // meta/snap.yaml
@@ -289,6 +293,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
           gadgetData = extracted.data;
           selectedChannel = channel;
           snapArchitectures = extracted.architectures;
+          snapVersion = extracted.version.isEmpty ? null : extracted.version;
           gadgetFilePath = extracted.gadgetPath;
           snapFilePath = extracted.snapPath;
           statusMessage = 'Gadget parsed successfully (cached)';
@@ -309,6 +314,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         gadgetData = extracted.data;
         selectedChannel = channel;
         snapArchitectures = extracted.architectures;
+        snapVersion = extracted.version.isEmpty ? null : extracted.version;
         gadgetFilePath = extracted.gadgetPath;
         snapFilePath = extracted.snapPath;
         statusMessage = 'Gadget parsed successfully';
@@ -353,6 +359,8 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
               : 'Local Snap';
           gadgetContent = extracted.content;
           gadgetData = extracted.data;
+          snapArchitectures = extracted.architectures;
+          snapVersion = extracted.version.isEmpty ? null : extracted.version;
           statusMessage = 'Local snap reloaded successfully (cached)';
         });
         return;
@@ -601,17 +609,23 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                             ),
                                           ],
                                         ),
-                                        subtitle: const Column(
+                                        subtitle: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            SizedBox(height: 4),
-                                            Text(
+                                            const SizedBox(height: 4),
+                                            const Text(
                                               'Loaded from local file',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.green,
                                               ),
                                             ),
+                                            if (snapVersion != null)
+                                              Text('Version: $snapVersion'),
+                                            if (snapArchitectures.isNotEmpty)
+                                              Text(
+                                                'Architecture: ${snapArchitectures.join(' / ')}',
+                                              ),
                                           ],
                                         ),
                                         onTap: () {

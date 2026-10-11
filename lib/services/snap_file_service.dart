@@ -12,6 +12,7 @@ class ExtractedGadget {
     this.snapPath,
     this.snapNameFromYaml = '',
     this.architectures = const [],
+    this.version = '',
   });
 
   /// Directory containing the `meta/` of the unpacked snap.
@@ -36,6 +37,9 @@ class ExtractedGadget {
   /// for which architectures this snap targets (`all` means any). Empty when
   /// `meta/snap.yaml` is absent or the field is missing.
   final List<String> architectures;
+
+  /// The `version` from `meta/snap.yaml` (empty when the field is missing).
+  final String version;
 }
 
 /// Exception thrown when a snap cannot be extracted or its metadata cannot
@@ -104,10 +108,14 @@ class SnapFileService {
 
     String snapNameFromYaml = '';
     final List<String> architectures = [];
+    String version = '';
     final snapData = loadYaml(await File(metaSnapPath).readAsString());
     if (snapData is YamlMap) {
       if (snapData.containsKey('name')) {
         snapNameFromYaml = snapData['name'] as String;
+      }
+      if (snapData.containsKey('version')) {
+        version = snapData['version'].toString();
       }
       architectures.addAll(_parseArchitectures(snapData));
     }
@@ -120,6 +128,7 @@ class SnapFileService {
       data: data,
       snapNameFromYaml: snapNameFromYaml,
       architectures: architectures,
+      version: version,
     );
   }
 
@@ -138,6 +147,7 @@ class SnapFileService {
     String? snapPath;
     String snapNameFromYaml = '';
     final List<String> architectures = [];
+    String version = '';
     final metaSnapPath = '$extractPath/meta/snap.yaml';
     if (await File(metaSnapPath).exists()) {
       snapPath = metaSnapPath;
@@ -145,6 +155,9 @@ class SnapFileService {
       if (snapData is YamlMap) {
         if (snapData.containsKey('name')) {
           snapNameFromYaml = snapData['name'] as String;
+        }
+        if (snapData.containsKey('version')) {
+          version = snapData['version'].toString();
         }
         architectures.addAll(_parseArchitectures(snapData));
       }
@@ -158,6 +171,7 @@ class SnapFileService {
       data: data,
       snapNameFromYaml: snapNameFromYaml,
       architectures: architectures,
+      version: version,
     );
   }
 
