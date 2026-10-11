@@ -29,6 +29,12 @@ class GadgetVolumesSection extends StatefulWidget {
 }
 
 class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
+  /// Per-volume handle to each volume-name [EditableTextField], so a
+  /// rejected save (e.g. an empty name) can snap the field back to the
+  /// original value. Keyed by volume name; a [ValueKey] on the field keeps
+  /// the right handle attached even if the volume order changes.
+  final Map<String, EditableTextFieldState> _volumeNameFields = {};
+
   @override
   Widget build(BuildContext context) {
     if (widget.volumes == null || (widget.volumes is YamlMap && widget.volumes.isEmpty)) {
@@ -87,15 +93,29 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                         const SizedBox(width: 8),
                         Flexible(
                           child: EditableTextField(
+                            key: ValueKey(volumeName),
                             text: volumeName,
                             label: 'Image Name',
                             onSave: (newName) {
+                              // An empty (or whitespace-only) name has nowhere
+                              // to be written and would leave a blank chip.
+                              // Reject it: show an error and snap the field back
+                              // to the original value without touching the file.
+                              if (newName.trim().isEmpty) {
+                                widget.onStatusUpdate
+                                    ?.call('Error: Volume name cannot be empty');
+                                _volumeNameFields[volumeName]?.resetToOriginal();
+                                return;
+                              }
                               // Update the volume name in the YAML file
                               if (widget.filePath != null) {
                                 _updateVolumeNameInFile(widget.filePath!, volumeName, newName);
                               }
                             },
                             style: const TextStyle(fontSize: 16),
+                            onStateCreated: (state) {
+                              _volumeNameFields[volumeName] = state;
+                            },
                           ),
                         ),
                       ],
