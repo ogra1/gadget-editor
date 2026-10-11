@@ -704,7 +704,6 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                           Expanded(
                             child: GadgetContent(
                               content: gadgetContent,
-                              isAmd64: snapArchitectures.contains('amd64'),
                               filePath: gadgetFilePath,
                               onContentChanged: (newContent) {
                                 // When content changes, update the state

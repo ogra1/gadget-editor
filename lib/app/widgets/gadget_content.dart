@@ -20,7 +20,6 @@ import 'simple_kernel_cmdline_editor.dart';
 ///   * Boot Options  -> (data, (section, index))  section in allow/append/remove
 class GadgetContent extends StatefulWidget {
   final String? content;
-  final bool isAmd64;
   final String? filePath;
   final Function(String)? onContentChanged; // Add callback for content changes
   final Function(String) onStatusUpdate; // Add status update callback
@@ -28,7 +27,6 @@ class GadgetContent extends StatefulWidget {
   const GadgetContent({
     super.key,
     required this.content,
-    required this.isAmd64,
     this.filePath,
     this.onContentChanged,
     required this.onStatusUpdate,
@@ -195,10 +193,12 @@ class _GadgetContentState extends State<GadgetContent> {
           ),
           const SizedBox(height: 16),
 
-          // Only show Extras section for non-amd64 platforms
-          if (!widget.isAmd64 && extras.isNotEmpty)
+          // Show the Extras section whenever the document has keys the editor
+          // does not have a dedicated section for. It is not architecture-
+          // dependent.
+          if (extras.isNotEmpty)
             GadgetSection(
-              title: 'Extras',
+              title: 'Extras (unknown keys)',
               data: extras,
             ),
         ],

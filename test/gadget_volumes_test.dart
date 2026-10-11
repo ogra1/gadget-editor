@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gadget_editor/app/widgets/gadget_volumes.dart';
 import 'package:gadget_editor/app/widgets/editable_text_field.dart';
+import 'package:gadget_editor/app/widgets/partition_size_editor.dart';
 import 'package:yaml/yaml.dart';
 
 const _volYaml = '''
@@ -22,6 +23,22 @@ volumes:
       - name: system-seed
         size: 1G
         role: system-seed
+        type: M
+''';
+
+const _multiPartitionYaml = '''
+name: pc
+volumes:
+  pc2004:
+    bootloader: grub
+    structure:
+      - name: system-seed
+        size: 1G
+        role: system-seed
+        type: M
+      - name: system-boot
+        size: 512M
+        role: system-boot
         type: M
 ''';
 
@@ -129,5 +146,49 @@ void main() {
     // The rename actually landed on disk.
     expect(file.readAsStringSync(), contains('pc26:'));
     expect(file.readAsStringSync(), isNot(contains('pc2004:')));
+  });
+
+  // The partition pencil is the only 18px edit icon in the tree; the volume-
+  // name chip's pencil is 14px. Filter by size to disambiguate.
+  Finder partitionPencil() => find.byWidgetPredicate(
+        (w) => w is Icon && w.icon == Icons.edit && w.size == 18.0,
+      );
+
+  testWidgets('a resizable partition is marked with a dimmed pencil and the whole tile opens the editor',
+      (tester) async {
+    final file = writeYaml(_multiPartitionYaml);
+    final statuses = <String>[];
+    await pumpSection(tester, filePath: file.path, statuses: statuses);
+
+    // Exactly one partition (system-seed) is resizable -> exactly one pencil.
+    expect(partitionPencil(), findsOneWidget);
+    // The pencil is dimmed (not opaque white).
+    final pencil = tester.widget<Icon>(partitionPencil());
+    expect(pencil.color?.a, lessThan(1.0));
+
+    // Tapping the resizable tile (via its label) opens the size editor.
+    await tester.tap(find.text('system-seed'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PartitionSizeEditor), findsOneWidget);
+    expect(find.text('Edit Size for system-seed'), findsOneWidget);
+
+    // Close the dialog again.
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PartitionSizeEditor), findsNothing);
+  });
+
+  testWidgets('tapping a non-resizable partition does not open the editor',
+      (tester) async {
+    final file = writeYaml(_multiPartitionYaml);
+    final statuses = <String>[];
+    await pumpSection(tester, filePath: file.path, statuses: statuses);
+
+    // system-boot is not resizable: no pencil is shown for it, and tapping it
+    // must not open the editor.
+    expect(partitionPencil(), findsOneWidget); // only the system-seed one
+    await tester.tap(find.text('system-boot'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PartitionSizeEditor), findsNothing);
   });
 }

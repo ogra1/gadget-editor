@@ -233,110 +233,155 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
         ),
       );
     }
-    // Create proportional visualization
+    // Create proportional visualization. Each partition is rendered by
+    // [_buildPartitionTile] so the "whole tile is tappable" behavior lives in
+    // one place.
     return SizedBox(
       height: 80,
       child: Row(
         children: [
-          for (var item in parsedStructures) 
+          for (var item in parsedStructures)
             Expanded(
               flex: (item['size']! / totalSize * 1000).toInt() > 0 ? (item['size']! / totalSize * 1000).toInt() : 1,
-              child: Container(
-                height: 78,
-                margin: const EdgeInsets.all(1),
-                decoration: BoxDecoration(
-                  color: _getPartitionColor(item['role'], item['size']!),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.grey.shade300, width: 0.5),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          // Text content centered
-                          Center(
-                            child: Text(
-                              item['name'] ?? 'Unnamed',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          // Edit icon for system-seed and system-data partitions
-                          if (item['role'] == 'system-seed' || item['role'] == 'system-data')
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: GestureDetector(
-                                onTap: () {
-                                  // Show the partition size editor dialog
-                                  showDialog(
-                                    context: context,
-                                    builder: (BuildContext context) {
-                                      return PartitionSizeEditor(
-                                        partitionName: item['name'] ?? 'Unnamed',
-                                        currentSize: _formatSize(item['size']),
-                                        filePath: widget.filePath,
-                                        volumeName: volumeName,
-                                        onSave: (newSize) {
-                                          // The dialog handles saving, so we just close it
-                                          if (widget.refreshCallback != null) {
-                                            widget.refreshCallback!();
-                                          }
-                                          Navigator.of(context).pop();
-                                        },
-                                        onCancel: () {
-                                          Navigator.of(context).pop();
-                                        },
-                                        onStatusUpdate: (message) {
-                                          if (widget.onStatusUpdate != null) {
-                                            widget.onStatusUpdate!(message);
-                                          } else if (widget.refreshCallback != null) {
-                                            // Fallback to refresh if no status update callback
-                                            widget.refreshCallback!();
-                                          }
-                                        },
-                                        onPartitionChanged: () {
-                                          // Trigger refresh when partition is changed
-                                          if (widget.refreshCallback != null) {
-                                            widget.refreshCallback!();
-                                          }
-                                        },
-                                      );
-                                    },
-                                  );
-                                },
-                                child: const Icon(
-                                  Icons.edit,
-                                  size: 18, // Larger size
-                                  color: Colors.white, // White color for better visibility
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      _formatSize(item['size']),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+              child: _buildPartitionTile(context, item, volumeName),
             ),
         ],
       ),
+    );
+  }
+
+  /// True when [role] names a partition the app allows resizing
+  /// (system-seed and system-data). The pencil marker is shown for exactly
+  /// these, so it doubles as the "this one is resizable" affordance.
+  static bool _isResizableRole(String? role) =>
+      role == 'system-seed' || role == 'system-data';
+
+  /// A single partition in the visualization: a pastel tile, sized
+  /// proportionally by its caller. The entire tile is tappable for resizable
+  /// partitions (system-seed / system-data); the pencil icon is kept as the
+  /// "this one is resizable" marker but dimmed so it does not compete with the
+  /// tile itself for attention.
+  Widget _buildPartitionTile(
+    BuildContext context,
+    Map<String, dynamic> item,
+    String volumeName,
+  ) {
+    final role = item['role'];
+    final double size = item['size'];
+    final String name = item['name'] ?? 'Unnamed';
+    final bool resizable = _isResizableRole(role);
+
+    final Widget tile = Container(
+      height: 78,
+      margin: const EdgeInsets.all(1),
+      decoration: BoxDecoration(
+        color: _getPartitionColor(role, size),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.grey.shade300, width: 0.5),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Stack(
+              children: [
+                // Partition name, centered.
+                Center(
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // "Resizable" marker: kept visible (it is the only hint about
+                // which partitions can be resized) but dimmed so the whole-tile
+                // tap target reads as the affordance.
+                if (resizable)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Icon(
+                      Icons.edit,
+                      size: 18,
+                      // 45% white: visible on the pastel fill, but clearly a
+                      // secondary marker rather than a button.
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            _formatSize(size),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+
+    if (!resizable) {
+      return tile;
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _showPartitionSizeEditor(context, name, size, volumeName),
+      child: tile,
+    );
+  }
+
+  /// Opens the size editor for a resizable partition and refreshes the view
+  /// once it reports a change.
+  void _showPartitionSizeEditor(
+    BuildContext context,
+    String partitionName,
+    double currentSize,
+    String volumeName,
+  ) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return PartitionSizeEditor(
+          partitionName: partitionName,
+          currentSize: _formatSize(currentSize),
+          filePath: widget.filePath,
+          volumeName: volumeName,
+          onSave: (newSize) {
+            // The dialog handles saving, so we just close it.
+            if (widget.refreshCallback != null) {
+              widget.refreshCallback!();
+            }
+            Navigator.of(context).pop();
+          },
+          onCancel: () {
+            Navigator.of(context).pop();
+          },
+          onStatusUpdate: (message) {
+            if (widget.onStatusUpdate != null) {
+              widget.onStatusUpdate!(message);
+            } else if (widget.refreshCallback != null) {
+              // Fallback to refresh if no status update callback.
+              widget.refreshCallback!();
+            }
+          },
+          onPartitionChanged: () {
+            // Trigger refresh when partition is changed.
+            if (widget.refreshCallback != null) {
+              widget.refreshCallback!();
+            }
+          },
+        );
+      },
     );
   }
 
