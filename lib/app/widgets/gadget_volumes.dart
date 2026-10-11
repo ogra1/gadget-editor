@@ -360,30 +360,58 @@ class _GadgetVolumesSectionState extends State<GadgetVolumesSection> {
                         ],
                       ),
                     ),
-                    Text(
-                      _formatSize(size),
-                      style: TextStyle(
-                        color: textColor,
-                        fontSize: 8,
-                      ),
-                      textAlign: TextAlign.center,
+                    // Bottom row: size label centered, plus a small info icon
+                    // in the bottom-right corner. The tooltip is bound to this
+                    // icon (not the whole tile) so it does not pop up every time
+                    // the pointer happens to cross the partition.
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _formatSize(size),
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 8,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 5),
+                          child: Tooltip(
+                            message: tooltip,
+                            child: Icon(
+                              Icons.info_outline,
+                              size: 14,
+                              // Subtle: an affordance hint, not a control.
+                              color: textColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 )
               : null,
         );
 
-        final Widget withTooltip = Tooltip(message: tooltip, child: box);
+        // Tooltip placement depends on whether the label fits:
+        //  - fits: the tooltip lives on the bottom-right info icon (inside the
+        //    tile), so the whole tile is not a tooltip trigger.
+        //  - !fits: the whole bare-stripe tile is the tooltip trigger, so the
+        //    data is still reachable for name-less partitions.
+        final Widget tileWidget =
+            fits ? box : Tooltip(message: tooltip, child: box);
 
         if (!resizable) {
-          return withTooltip;
+          return tileWidget;
         }
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () =>
               _showPartitionSizeEditor(context, name, size, volumeName),
-          child: withTooltip,
+          child: tileWidget,
         );
       },
     );

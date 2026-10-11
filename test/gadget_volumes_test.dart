@@ -284,6 +284,41 @@ void main() {
       expect(messages, contains('size: 5.0G'));
     });
 
+    testWidgets('labeled partitions expose a small info icon as the tooltip trigger',
+        (tester) async {
+      final file = writeYaml(_stripeYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+
+      // Two partitions show their labels (save, data) -> each carries an info
+      // icon; the bare-stripe partition (boot) has none.
+      expect(find.byIcon(Icons.info_outline), findsNWidgets(2));
+
+      // The info-icon tooltips carry the labeled partitions' data only.
+      final iconMessages = tester
+          .widgetList<Tooltip>(find.byType(Tooltip))
+          .where((t) => t.child is Icon)
+          .map((t) => t.message)
+          .join('\n');
+      expect(iconMessages, contains('name: save'));
+      expect(iconMessages, contains('name: data'));
+      expect(iconMessages, isNot(contains('name: boot')));
+    });
+
+    testWidgets('a bare-stripe partition binds its tooltip to the whole tile (no info icon)',
+        (tester) async {
+      final file = writeYaml(_stripeYaml);
+      await pumpSection(tester, filePath: file.path, statuses: <String>[]);
+
+      // Exactly one partition is a bare stripe (boot) -> its tooltip's child is
+      // the tile Container (the whole tile is the trigger), not an Icon.
+      final wholeTileTooltips = tester
+          .widgetList<Tooltip>(find.byType(Tooltip))
+          .where((t) => t.child is Container)
+          .toList();
+      expect(wholeTileTooltips, hasLength(1));
+      expect(wholeTileTooltips.single.message, contains('name: boot'));
+    });
+
     testWidgets('content list wraps one target per line (no single wide line)',
         (tester) async {
       final file = writeYaml(_contentYaml);
