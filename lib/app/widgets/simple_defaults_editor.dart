@@ -175,6 +175,7 @@ class _SimpleDefaultsEditorState extends State<SimpleDefaultsEditor> {
                       key: _snapIdFieldKey,
                       controller: _snapIdController,
                       lookupService: widget.lookupService,
+                      hint: 'Snap name or 32-character ID',
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a snap ID';

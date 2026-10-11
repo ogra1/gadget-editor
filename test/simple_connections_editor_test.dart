@@ -342,4 +342,30 @@ connections:
     );
     expect(editable.controller.text, isEmpty);
   });
+
+  testWidgets('advertises that a snap name can be typed in the Snap ID fields',
+      (tester) async {
+    final file = writeTemp('gadget.yaml', 'name: pc\n');
+    await pumpEditor(
+      tester,
+      filePath: file.path,
+      onSave: (_) {},
+      onStatusUpdate: (_) {},
+    );
+
+    // Both plug and slot Snap ID fields carry the placeholder, the two
+    // interface fields do not (so the total is exactly 2, not 4).
+    const hint = 'Snap name or 32-character ID';
+    expect(find.text(hint), findsNWidgets(2));
+    // And both are attached to the Snap ID fields specifically.
+    expect(
+      find.descendant(
+        of: find.widgetWithText(TextFormField, 'Snap ID'),
+        matching: find.text(hint),
+      ),
+      findsNWidgets(2),
+      reason: 'the name-search hint belongs to the Snap ID fields only',
+    );
+
+  });
 }

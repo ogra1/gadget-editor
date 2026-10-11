@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gadget_editor/app/widgets/editable_text_field.dart';
 
@@ -226,5 +227,103 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('pc-26'), findsOneWidget);
     expect(find.text('bad name'), findsNothing);
+  });
+
+  // ---- Collapse on dismiss (focus loss / Escape) ----
+
+  /// Opens the editor and asserts the expanded field is present.
+  Future<void> openEditor(WidgetTester tester) async {
+    await tester.tap(find.byIcon(Icons.edit));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+  }
+
+  /// Pumps the field inside a bounded Row with a second, focusable
+  /// [TextField] sibling, so a test can steal focus from the editor to
+  /// exercise the focus-loss collapse path without remounting the widget.
+  Future<void> pumpWithSibling(
+    WidgetTester tester, {
+    required Function(String) onSave,
+  }) {
+    return tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 200,
+            child: Row(
+              children: [
+                Flexible(
+                  child: EditableTextField(
+                    text: 'pc',
+                    onSave: onSave,
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // Focusable sibling the user can click to dismiss the edit.
+                const SizedBox(width: 120, child: TextField()),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  testWidgets('Escape cancels the edit and collapses back to the chip',
+      (tester) async {
+    String? saved;
+    await _pump(tester, onSave: (v) => saved = v);
+    await openEditor(tester);
+    await tester.enterText(find.byType(TextField), 'changed');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    // Collapsed to the chip, original value restored, onSave NOT invoked.
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('pc'), findsOneWidget);
+    expect(find.text('changed'), findsNothing);
+    expect(saved, isNull);
+  });
+
+  testWidgets('moving focus away cancels the edit and collapses',
+      (tester) async {
+    String? saved;
+    await pumpWithSibling(tester, onSave: (v) => saved = v);
+
+    // The editor is the first text field; the sibling is the last.
+    await tester.tap(find.byIcon(Icons.edit));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'changed');
+
+    // Click the sibling field: focus moves, the editor must collapse and
+    // revert to the original value without invoking onSave.
+    await tester.tap(find.byType(TextField).last);
+    await tester.pumpAndSettle();
+
+    expect(saved, isNull);
+    expect(find.text('pc'), findsOneWidget);
+    expect(find.text('changed'), findsNothing);
+    // Only the (non-editing) sibling remains a text field.
+    expect(find.byType(TextField), findsOneWidget);
+  });
+
+  testWidgets('an explicit save is NOT reverted by the focus loss it causes',
+      (tester) async {
+    String? saved;
+    await _pump(tester, onSave: (v) => saved = v);
+    await openEditor(tester);
+    await tester.enterText(find.byType(TextField), 'pc-26');
+
+    // Saving collapses the field (chip replaces it), which drops focus. The
+    // focus-loss handler must be inert here so the save is not cancelled.
+    await tester.tap(find.byIcon(Icons.check));
+    await tester.pumpAndSettle();
+
+    expect(saved, 'pc-26');
+    expect(find.text('pc-26'), findsOneWidget);
+    expect(find.text('pc'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
   });
 }

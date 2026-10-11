@@ -23,6 +23,7 @@ class SnapIdField extends StatefulWidget {
     required this.controller,
     this.lookupService,
     this.validator,
+    this.hint,
     this.onChanged,
   });
 
@@ -34,6 +35,11 @@ class SnapIdField extends StatefulWidget {
 
   /// External (format) validator, forwarded to the [TextFormField].
   final String? Function(String?)? validator;
+
+  /// Placeholder shown inside the field (e.g. to advertise that a snap name
+  /// can be typed instead of a 32-character ID). Rendered by [TextFormField]
+  /// only while the field is empty, so it adds no extra row.
+  final String? hint;
 
   /// Notified on every text change, including resolver-driven ones.
   final ValueChanged<String>? onChanged;
@@ -170,6 +176,7 @@ class SnapIdFieldState extends State<SnapIdField> {
       validator: widget.validator,
       decoration: InputDecoration(
         labelText: 'Snap ID',
+        hintText: widget.hint,
         suffixIcon: _buildSuffixIcon(context),
       ),
     );

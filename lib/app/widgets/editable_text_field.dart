@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 
 /// A compact, outlined, in-place editable text field.
 ///
@@ -7,6 +9,11 @@ import 'package:flutter/material.dart';
 /// it (or the pencil) expands the field in place to fill the row as a real
 /// outlined [TextField]. Saving (check / Enter) commits via [onSave];
 /// cancelling (X) reverts to the original value.
+///
+/// The editor also collapses whenever the user dismisses it without an
+/// explicit save: pressing Escape, or moving focus away (clicking another
+/// field, Tab, or the window losing focus). A dismissed edit is cancelled,
+/// so the original value is restored and [onSave] is not invoked.
 ///
 /// [label] is an optional caption (e.g. "Image Name"). At rest it is drawn as
 /// a small caption above the chip; while editing it becomes the field's
@@ -57,6 +64,12 @@ class _EditableTextFieldState extends State<EditableTextField> {
     _originalText = widget.text;
     _controller = TextEditingController(text: _currentText);
 
+    // Collapse when the user dismisses the editor without an explicit save:
+    // Escape, or the field losing focus (another field focused, Tab, or the
+    // window blurred). A dismissed edit reverts to the original value.
+    _focusNode.addListener(_onFocusChange);
+    _focusNode.onKeyEvent = _onEditorKey;
+
     // Expose the state to parent widget
     widget.onStateCreated?.call(EditableTextFieldState(_resetToOriginal));
   }
@@ -88,6 +101,28 @@ class _EditableTextFieldState extends State<EditableTextField> {
       _controller.text = _currentText;
     });
   }
+
+  /// Escape dismisses the editor (cancelling the in-progress edit).
+  KeyEventResult _onEditorKey(FocusNode node, KeyEvent event) {
+    if (_isEditing &&
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      _cancel();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// Collapse when focus leaves the editor mid-edit. The [_isEditing] guard
+  /// keeps this inert for the focus loss that follows an explicit save or
+  /// cancel (when the field is already back to the chip), so only a genuine
+  /// dismissal reverts the value.
+  void _onFocusChange() {
+    if (_isEditing && !_focusNode.hasFocus) {
+      _cancel();
+    }
+  }
+
 
   void _startEditing() {
     if (!widget.enabled) {

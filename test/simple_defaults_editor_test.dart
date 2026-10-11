@@ -310,4 +310,22 @@ void main() {
 
     expect(statuses.last, 'Error: No file path provided');
   });
+
+  testWidgets('advertises that a snap name can be typed in the Snap ID field',
+      (tester) async {
+    final file = writeTemp('gadget.yaml', 'name: pc\n');
+    await pumpEditor(
+      tester,
+      filePath: file.path,
+      onSave: (_) {},
+      onStatusUpdate: (_) {},
+    );
+
+    // The hint is a placeholder: it only paints once the empty field is
+    // focused, so tap the field to focus it.
+    await tester.tap(find.widgetWithText(TextFormField, 'Snap ID'));
+    await tester.pump();
+
+    expect(find.text('Snap name or 32-character ID'), findsOneWidget);
+  });
 }

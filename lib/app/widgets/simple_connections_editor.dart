@@ -215,6 +215,7 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
                             key: _plugSnapIdFieldKey,
                             controller: _plugSnapIdController,
                             lookupService: widget.lookupService,
+                            hint: 'Snap name or 32-character ID',
                             validator: (value) {
                               if (value != null &&
                                   value.isNotEmpty &&
@@ -267,6 +268,7 @@ class _SimpleConnectionsEditorState extends State<SimpleConnectionsEditor> {
                             key: _slotSnapIdFieldKey,
                             controller: _slotSnapIdController,
                             lookupService: widget.lookupService,
+                            hint: 'Snap name or 32-character ID',
                             validator: (value) {
                               if (value != null &&
                                   value.isNotEmpty &&
