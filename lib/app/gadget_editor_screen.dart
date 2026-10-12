@@ -77,6 +77,9 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   // Reference to the EditableTextField for reset functionality
   EditableTextFieldState? _snapNameFieldState;
 
+  // Reference to the version EditableTextField for reset functionality
+  EditableTextFieldState? _snapVersionFieldState;
+
   // Services backing the store, file and pack operations.
   final SnapStoreService _storeService = SnapStoreService();
   final SnapFileService _fileService = SnapFileService();
@@ -426,6 +429,49 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       });
     }
   }
+  //  Save an edited snap version into meta/snap.yaml (inserting the key if
+  //  it is absent). Mirrors [_saveSnapNameToFile].
+  Future<void> _saveSnapVersionToFile(String newVersion) async {
+    final snapPath = snapFilePath;
+    if (snapPath == null) {
+      setState(() {
+        statusMessage = 'Error: No snap.yaml file path available';
+      });
+      return;
+    }
+
+    final trimmed = newVersion.trim();
+    if (trimmed.isEmpty || trimmed.contains('\n') || trimmed.contains('\r')) {
+      setState(() {
+        statusMessage = 'Invalid version: must be a non-empty single line';
+      });
+      _snapVersionFieldState?.resetToOriginal();
+      return;
+    }
+
+    try {
+      final file = File(snapPath);
+      final content = await file.readAsString();
+
+      // Use yaml_edit to update just the version key, preserving the rest of
+      // the file (including formatting and any unknown keys). yaml_edit
+      // inserts the key at the end when it is absent.
+      final yamlEditor = YamlEditor(content);
+      yamlEditor.update(['version'], trimmed);
+      final newYamlString = yamlEditor.toString();
+
+      await file.writeAsString(newYamlString);
+
+      setState(() {
+        snapVersion = trimmed;
+        statusMessage = 'Version saved successfully';
+      });
+    } catch (e) {
+      setState(() {
+        statusMessage = 'Error saving version: $e';
+      });
+    }
+  }
   //  New function to pack a snap package
   Future<void> _packSnap() async {
     final gadgetYamlPath = gadgetFilePath;
@@ -681,6 +727,30 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                                   onStateCreated: (state) {
                                     // Capture the state reference for later use
                                     _snapNameFieldState = state;
+                                  },
+                                ),
+                              ),
+                              // Editable snap version (between name and arch).
+                              const SizedBox(width: 16),
+                              Text(
+                                'Version:',
+                                style: Theme.of(context).textTheme.headlineSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 130,
+                                child: EditableTextField(
+                                  text: snapVersion ?? '',
+                                  onSave: (newVersion) {
+                                    _saveSnapVersionToFile(newVersion);
+                                  },
+                                  style: const TextStyle(fontSize: 16),
+                                  onStateCreated: (state) {
+                                    _snapVersionFieldState = state;
                                   },
                                 ),
                               ),
