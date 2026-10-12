@@ -655,4 +655,75 @@ connections:
       expect(returned, gadget.toYaml());
     });
   });
+
+  group('getApiKey / setApiKey', () {
+    const keyDoc = '''
+name: pc
+version: 26-0.1
+base: core26
+hooks:
+  prepare-device:
+    environment:
+      MODEL_APIKEY: ''
+''';
+
+    test('getApiKey returns null when the hook/key is absent', () {
+      final g = GadgetYaml.fromContent('name: pc\nversion: 1\n');
+      expect(g.getApiKey(), isNull);
+    });
+
+    test('getApiKey returns an empty string for an empty key', () {
+      final g = GadgetYaml.fromContent(keyDoc);
+      expect(g.getApiKey(), '');
+    });
+
+    test('getApiKey returns the configured value', () {
+      final g = GadgetYaml.fromContent(keyDoc.replaceAll("''", "'abc123'"));
+      expect(g.getApiKey(), 'abc123');
+    });
+
+    test('setApiKey sets an existing key in place (no reorder)', () {
+      final g = GadgetYaml.fromContent(keyDoc);
+      g.setApiKey('secret-value');
+      expect(g.getApiKey(), 'secret-value');
+      // The value is written in place; the key keeps its position and the
+      // document order is preserved (name still first, hooks still present).
+      expect(g.toYaml(), contains('MODEL_APIKEY: secret-value'));
+      expect(g.toYaml().indexOf('name: pc'), 0);
+    });
+
+    test('setApiKey creates the hooks/prepare-device/environment nesting', () {
+      final g = GadgetYaml.fromContent('name: pc\nversion: 1\n');
+      g.setApiKey('k1');
+      expect(g.getApiKey(), 'k1');
+      final m = g.toMap();
+      expect(
+        m['hooks']['prepare-device']['environment']['MODEL_APIKEY'],
+        'k1',
+      );
+    });
+
+    test('setApiKey overwrites a previously set value', () {
+      final g = GadgetYaml.fromContent(keyDoc);
+      g.setApiKey('first');
+      g.setApiKey('second');
+      expect(g.getApiKey(), 'second');
+    });
+
+    test('setApiKey persists an empty string (clearing the key)', () {
+      final g = GadgetYaml.fromContent(keyDoc.replaceAll("''", "'abc'"));
+      g.setApiKey('');
+      expect(g.getApiKey(), '');
+    });
+
+    test('file-backed setApiKey persists to disk on save', () {
+      final file = writeTemp('gadget.yaml', keyDoc);
+      final g = GadgetYaml.fromFile(file.path);
+      g.setApiKey('disk-value');
+      g.save();
+      expect(g.getApiKey(), 'disk-value');
+      // A fresh read from disk sees the value too.
+      expect(GadgetYaml.fromFile(file.path).getApiKey(), 'disk-value');
+    });
+  });
 }

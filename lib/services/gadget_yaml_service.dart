@@ -713,6 +713,25 @@ class GadgetYaml {
     });
   }
 
+  /// The value of the `MODEL_APIKEY` environment variable configured for the
+  /// `prepare-device` hook, or `null` when the hook or the key is absent.
+  ///
+  /// The `prepare-device` hook runs on first boot of an Ubuntu Core system
+  /// and uses this key to onboard the device to a store.
+  String? getApiKey() {
+    final node = nodeAt(const ['hooks', 'prepare-device', 'environment', 'MODEL_APIKEY']);
+    return node?.value?.toString();
+  }
+
+  /// Sets the `MODEL_APIKEY` environment variable for the `prepare-device`
+  /// hook, creating the `hooks` / `prepare-device` / `environment` nesting as
+  /// needed. An empty string is a valid (unset) key and is preserved as-is.
+  ///
+  /// Routes through [update] so any missing intermediate maps are created in
+  /// block style and the existing file order is preserved.
+  void setApiKey(String key) =>
+      update(const ['hooks', 'prepare-device', 'environment', 'MODEL_APIKEY'], key);
+
   /// Removes the top-level volume [name] entirely.
   // ---------------------------------------------------------------------
   // Internals

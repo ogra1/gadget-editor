@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:gadget_editor/services/gadget_yaml_service.dart';
+import 'package:gadget_editor/services/prepare_device_hook_service.dart';
 
+import 'api_key_section.dart';
 import 'gadget_section.dart';
 import 'gadget_volumes.dart';
 import 'simple_connections_editor.dart';
@@ -21,6 +23,10 @@ import 'simple_kernel_cmdline_editor.dart';
 class GadgetContent extends StatefulWidget {
   final String? content;
   final String? filePath;
+
+  /// Path to `meta/snap.yaml` – the file carrying `hooks.prepare-device`
+  /// (the store API key). Distinct from [filePath], which is `gadget.yaml`.
+  final String? snapFilePath;
   final Function(String)? onContentChanged; // Add callback for content changes
   final Function(String) onStatusUpdate; // Add status update callback
 
@@ -28,6 +34,7 @@ class GadgetContent extends StatefulWidget {
     super.key,
     required this.content,
     this.filePath,
+    this.snapFilePath,
     this.onContentChanged,
     required this.onStatusUpdate,
   });
@@ -37,6 +44,9 @@ class GadgetContent extends StatefulWidget {
 }
 
 class _GadgetContentState extends State<GadgetContent> {
+
+  /// Creates/ensures the prepare-device hook script next to snap.yaml.
+  final PrepareDeviceHookService _hookService = PrepareDeviceHookService();
   Map<String, dynamic> _yamlData = const {};
   String _error = '';
 
@@ -124,7 +134,14 @@ class _GadgetContentState extends State<GadgetContent> {
     final connections = _yamlData['connections'];
     final kernelCmdline = _yamlData['kernel-cmdline'];
     final extras = <String, dynamic>{};
-    final mainKeys = ['volumes', 'schema', 'bootloader', 'defaults', 'connections', 'kernel-cmdline'];
+    final mainKeys = [
+      'volumes',
+      'schema',
+      'bootloader',
+      'defaults',
+      'connections',
+      'kernel-cmdline'
+    ];
     for (var key in _yamlData.keys) {
       if (!mainKeys.contains(key)) {
         extras[key] = _yamlData[key];
@@ -201,6 +218,15 @@ class _GadgetContentState extends State<GadgetContent> {
               title: 'Extras (unknown keys)',
               data: extras,
             ),
+          const SizedBox(height: 16),
+
+          // Store API Key (MODEL_APIKEY for the prepare-device hook). Always
+          // shown for a loaded gadget; a single scalar, so it is edited inline
+          // rather than through a dialog.
+          ApiKeySection(
+            currentKey: _currentApiKey(),
+            onSave: _saveApiKey,
+          ),
         ],
       ),
     );
@@ -294,9 +320,53 @@ class _GadgetContentState extends State<GadgetContent> {
     }
   }
 
+  /// The current value of the store API key, read from `meta/snap.yaml`
+  /// (`hooks.prepare-device.environment.MODEL_APIKEY`), or `''` when absent
+  /// or when no snap.yaml path is available.
+  String _currentApiKey() {
+    final path = widget.snapFilePath;
+    if (path == null) return '';
+    try {
+      return GadgetYaml.fromFile(path).getApiKey() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Persists a new store API key in `meta/snap.yaml` through the
+  /// [GadgetYaml] service (the key lives in snap.yaml, not gadget.yaml).
+  void _saveApiKey(String key) {
+    final path = widget.snapFilePath;
+    if (path == null) {
+      _status('Error saving store key: no snap.yaml loaded');
+      return;
+    }
+    try {
+      final yaml = GadgetYaml.fromFile(path);
+      yaml.setApiKey(key);
+      yaml.save();
+
+      // A non-empty key means the device will call home on first boot, so the
+      // prepare-device hook must exist to consume MODEL_APIKEY. It is only
+      // created when missing (never overwritten) and only when a key is set,
+      // so clearing the key does not conjure a hook.
+      if (key.isNotEmpty) {
+        _hookService.ensureScript(path);
+      }
+      _status('Store key saved');
+    } on GadgetYamlException catch (e) {
+      _status('Error saving store key: ${e.message}');
+    } on PrepareDeviceHookException catch (e) {
+      _status('Error saving store key: ${e.message}');
+    } catch (e) {
+      _status('Error saving store key: $e');
+    }
+  }
+
   void _status(String message) => widget.onStatusUpdate(message);
 
-  void _showEditorDialog(BuildContext context, String title, dynamic data, Function(dynamic) onSave) {
+  void _showEditorDialog(BuildContext context, String title, dynamic data,
+      Function(dynamic) onSave) {
     Widget editorWidget;
 
     switch (title) {

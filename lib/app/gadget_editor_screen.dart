@@ -630,6 +630,7 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
               child: GadgetContent(
                 content: gadgetContent,
                 filePath: gadgetFilePath,
+                snapFilePath: snapFilePath,
                 onContentChanged: (newContent) {
                   // When content changes, update the state
                   setState(() {
