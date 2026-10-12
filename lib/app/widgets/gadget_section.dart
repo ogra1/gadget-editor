@@ -86,10 +86,14 @@ class GadgetSection extends StatelessWidget {
           ),
         ),
         if (showAddButton && showEditButton && onEdit != null)
-          IconButton(
-            icon: const Icon(Icons.add, size: 18),
+          TextButton(
             onPressed: onEdit,
-            tooltip: 'Add $title',
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              minimumSize: const Size(48, 30),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            child: const Text('Add'),
           ),
       ],
     );

@@ -49,8 +49,9 @@ void main() {
       );
       expect(find.text('Add Defaults'), findsOneWidget);
       expect(find.byKey(const ValueKey('gadget-section-dashed-zone')), findsOneWidget);
-      // The drop-zone button supersedes the header + in the empty state.
-      expect(find.byIcon(Icons.add), findsNothing);
+      // The drop-zone button supersedes the header Add button in the
+      // empty state.
+      expect(find.text('Add'), findsNothing);
     });
 
     testWidgets('[$mode] Connections + Boot Options empty states differ per section',
@@ -96,9 +97,9 @@ void main() {
       expect(find.textContaining('ubuntu-autostart-services'), findsOneWidget);
       expect(find.text('Add Defaults'), findsNothing);
       expect(find.byKey(const ValueKey('gadget-section-dashed-zone')), findsNothing);
-      // With data present the header + is the only add affordance, so it
-      // must remain.
-      expect(find.byIcon(Icons.add), findsOneWidget);
+      // With data present the compact header "Add" text button is the only
+      // add affordance, so it must remain.
+      expect(find.text('Add'), findsOneWidget);
     });
   }
 }
