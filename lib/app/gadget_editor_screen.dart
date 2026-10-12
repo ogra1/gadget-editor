@@ -201,7 +201,7 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
       final message = _serviceErrorMessage(e);
       setState(() {
         error = message;
-        statusMessage = '\n$error';
+        statusMessage = 'Error: $error';
       });
     } finally {
       setState(() {

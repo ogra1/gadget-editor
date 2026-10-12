@@ -27,15 +27,28 @@ class StatusBar extends StatelessWidget {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            message,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF8E8E8E),
+          // Error strings can be very long (multi-line snapd/store output).
+          // The bar is a fixed 60px strip, so render the message on a single
+          // line with an ellipsis and expose the full text via the tooltip —
+          // an unconstrained Text would wrap and overflow the bar.
+          Expanded(
+            child: Tooltip(
+              message: message,
+              child: Text(
+                key: const ValueKey('status-bar-message'),
+                message,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF8E8E8E),
+                ),
+              ),
             ),
           ),
+          const SizedBox(width: 16),
           SizedBox(
             height: 40,
             child: ElevatedButton(
