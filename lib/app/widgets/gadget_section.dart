@@ -53,7 +53,11 @@ class GadgetSection extends StatelessWidget {
 
   /// Header row shared by the empty and populated states: a tinted icon chip
   /// plus the title, with the add control on the right when applicable.
-  Widget _buildHeader(BuildContext context) {
+  ///
+  /// [showAddButton] is false in the empty state, where the drop-zone's
+  /// "Add …" button already provides the add affordance (the header + would
+  /// be redundant).
+  Widget _buildHeader(BuildContext context, {bool showAddButton = true}) {
     final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
@@ -81,7 +85,7 @@ class GadgetSection extends StatelessWidget {
             ),
           ),
         ),
-        if (showEditButton && onEdit != null)
+        if (showAddButton && showEditButton && onEdit != null)
           IconButton(
             icon: const Icon(Icons.add, size: 18),
             onPressed: onEdit,
@@ -160,7 +164,9 @@ class GadgetSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildHeader(context),
+            // In the empty state the drop-zone button is the add affordance,
+            // so hide the header's + to avoid a duplicate.
+            _buildHeader(context, showAddButton: !isEmpty),
             body,
           ],
         ),
