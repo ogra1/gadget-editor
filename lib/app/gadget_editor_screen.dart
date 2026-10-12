@@ -1,15 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:yaru/yaru.dart';
 import 'package:path/path.dart' as path;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter_window_close/flutter_window_close.dart';
 import 'package:yaml_edit/yaml_edit.dart';
 import 'widgets/status_bar.dart';
-import 'widgets/channel_list.dart';
-import 'widgets/sidebar_header.dart';
-import 'widgets/search_section.dart';
-import 'widgets/local_snap_loader.dart';
+import 'widgets/gadget_sidebar.dart';
 import 'widgets/gadget_content.dart';
 import 'widgets/empty_state.dart';
 import 'widgets/editable_text_field.dart';
@@ -552,266 +548,49 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
       ),
       body: Column(
         children: [
-          // Main content area with sidebar and main content
+          // Main content area: fixed sidebar + editor pane.
           Expanded(
             child: Row(
               children: [
-                // Left sidebar with snap input and channels
-                Container(
-                  width: 300,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      right: BorderSide(
-                        color: Theme.of(context).dividerColor,
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SidebarHeader(),
-                      const SizedBox(height: 16),
-                      SearchSection(
-                        controller: _searchController,
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty) {
-                            // Only set snapName from the actual snap.yaml content when downloading
-                            fetchSnapChannels(value);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      LocalSnapLoader(
-                        onPressed: () async {
-                          try {
-                            // Use file_selector for cross-platform file picking
-                            final file = await openFile();
-                            if (file != null) {
-                              loadLocalGadgetSnap(file.path);
-                            }
-                          } catch (e) {
-                            setState(() {
-                              error = 'Failed to select file: $e';
-                              statusMessage = 'Error: Failed to select file';
-                              isActionButtonEnabled = false; // Disable button on error
-                            });
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      if (availableChannels.isNotEmpty)
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Available Channels:',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: ChannelList(
-                                  channels: availableChannels,
-                                  onChannelSelected: downloadSelectedChannel,
-                                  isDownloading: isDownloading,
-                                  selectedChannel: selectedChannel,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (isLocalMode && gadgetData != null)
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Local Snap:',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: ListView(
-                                  children: [
-                                    // Show local snap info (a Card so the
-                                    // ListTile's ink has a Material to paint on).
-                                    Card(
-                                      elevation: 0,
-                                      margin: const EdgeInsets.symmetric(vertical: 4),
-                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        side: BorderSide(color: Theme.of(context).primaryColor),
-                                      ),
-                                      child: ListTile(
-                                        title: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.check_circle,
-                                              size: 16,
-                                              color: Theme.of(context).colorScheme.success,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                snapName ?? 'Unknown',
-                                                style: const TextStyle(fontWeight: FontWeight.normal),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        subtitle: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Loaded from local file',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Theme.of(context).colorScheme.success,
-                                              ),
-                                            ),
-                                            if (snapVersion != null)
-                                              Text('Version: $snapVersion'),
-                                            if (snapArchitectures.isNotEmpty)
-                                              Text(
-                                                'Architecture: ${snapArchitectures.join(' / ')}',
-                                              ),
-                                          ],
-                                        ),
-                                        onTap: () {
-                                          // Reload the local snap when clicked
-                                          reloadLocalSnap();
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        const Expanded(
-                          child: SizedBox.shrink(), // Sidebar shows nothing but search and button
-                        ),
-                    ],
-                  ),
+                GadgetEditorSidebar(
+                  searchController: _searchController,
+                  onSearchSubmitted: (value) {
+                    if (value.isNotEmpty) {
+                      // Only set snapName from the actual snap.yaml content when downloading
+                      fetchSnapChannels(value);
+                    }
+                  },
+                  onLocalSnapPicked: () async {
+                    try {
+                      // Use file_selector for cross-platform file picking
+                      final file = await openFile();
+                      if (file != null) {
+                        loadLocalGadgetSnap(file.path);
+                      }
+                    } catch (e) {
+                      setState(() {
+                        error = 'Failed to select file: $e';
+                        statusMessage = 'Error: Failed to select file';
+                        isActionButtonEnabled = false; // Disable button on error
+                      });
+                    }
+                  },
+                  availableChannels: availableChannels,
+                  selectedChannel: selectedChannel,
+                  isDownloading: isDownloading,
+                  onChannelSelected: downloadSelectedChannel,
+                  isLocalMode: isLocalMode,
+                  hasGadgetData: gadgetData != null,
+                  snapName: snapName,
+                  snapVersion: snapVersion,
+                  snapArchitectures: snapArchitectures,
+                  onLocalSnapReload: reloadLocalSnap,
                 ),
-                // Main content area
-                Expanded(
-                  child: Container(
-                    color: Theme.of(context).colorScheme.surface,
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (gadgetData != null)
-                          Row(
-                            children: [
-                              // Caption with bold font and same size as name
-                              SizedBox(
-                                width: 100,
-                                child: Text(
-                                  'Snap Name:',
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16, // Same size as name
-                                  ),
-                                ),
-                              ),
-                              Flexible(
-                                child: EditableTextField(
-                                  // Key so widget tests can target the name
-                                  // field specifically (there are two such
-                                  // fields in the header).
-                                  key: const ValueKey('snap-name-field'),
-                                  text: snapName ?? 'Unknown',
-                                  onSave: (newName) {
-                                    // Save to file when the user clicks save
-                                    _saveSnapNameToFile(newName);
-                                  },
-                                  style: const TextStyle(fontSize: 16),
-                                  onStateCreated: (state) {
-                                    // Capture the state reference for later use
-                                    _snapNameFieldState = state;
-                                  },
-                                ),
-                              ),
-                              // Editable snap version (between name and arch).
-                              const SizedBox(width: 16),
-                              Text(
-                                'Version:',
-                                style: Theme.of(context).textTheme.headlineSmall
-                                        ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 130,
-                                child: EditableTextField(
-                                  key: const ValueKey('snap-version-field'),
-                                  text: snapVersion ?? '',
-                                  onSave: (newVersion) {
-                                    _saveSnapVersionToFile(newVersion);
-                                  },
-                                  style: const TextStyle(fontSize: 16),
-                                  onStateCreated: (state) {
-                                    _snapVersionFieldState = state;
-                                  },
-                                ),
-                              ),
-                              // Which architecture the loaded snap targets.
-                              if (snapArchitectures.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 12),
-                                  child: ArchBadge(
-                                      architectures: snapArchitectures),
-                                ),
-                            ],
-                          )
-                        else
-                          const Text(
-                            'Gadget Editor',
-                            style: TextStyle(
-                              fontSize: 24,
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        if (gadgetData != null)
-                          Expanded(
-                            child: GadgetContent(
-                              content: gadgetContent,
-                              filePath: gadgetFilePath,
-                              onContentChanged: (newContent) {
-                                // When content changes, update the state
-                                setState(() {
-                                  gadgetContent = newContent;
-                                });
-                              },
-                              onStatusUpdate: (message) {
-                                setState(() {
-                                  statusMessage = message;
-                                });
-                              },
-                            ),
-                          )
-                        else
-                          const Expanded(
-                            child: EmptyState(),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                // The editor pane takes the remaining width (the sidebar is a
+                // fixed 300px). Without Expanded the pane would get an
+                // unbounded width and the header row's Flexible children
+                // would overflow.
+                Expanded(child: _buildMainContent(context)),
               ],
             ),
           ),
@@ -823,6 +602,121 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// The right-hand editor pane: the snap header row (name, version,
+  /// architecture) followed by the gadget content, or a placeholder when
+  /// nothing is loaded.
+  Widget _buildMainContent(BuildContext context) {
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (gadgetData != null)
+            _buildHeaderRow(context)
+          else
+            const Text(
+              'Gadget Editor',
+              style: TextStyle(
+                fontSize: 24,
+              ),
+            ),
+          const SizedBox(height: 16),
+          if (gadgetData != null)
+            Expanded(
+              child: GadgetContent(
+                content: gadgetContent,
+                filePath: gadgetFilePath,
+                onContentChanged: (newContent) {
+                  // When content changes, update the state
+                  setState(() {
+                    gadgetContent = newContent;
+                  });
+                },
+                onStatusUpdate: (message) {
+                  setState(() {
+                    statusMessage = message;
+                  });
+                },
+              ),
+            )
+          else
+            const Expanded(
+              child: EmptyState(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The editable snap header row: name, version, and architecture badge.
+  Widget _buildHeaderRow(BuildContext context) {
+    return Row(
+      children: [
+        // Caption with bold font and same size as name
+        SizedBox(
+          width: 100,
+          child: Text(
+            'Snap Name:',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16, // Same size as name
+                ),
+          ),
+        ),
+        Flexible(
+          child: EditableTextField(
+            // Key so widget tests can target the name
+            // field specifically (there are two such
+            // fields in the header).
+            key: const ValueKey('snap-name-field'),
+            text: snapName ?? 'Unknown',
+            onSave: (newName) {
+              // Save to file when the user clicks save
+              _saveSnapNameToFile(newName);
+            },
+            style: const TextStyle(fontSize: 16),
+            onStateCreated: (state) {
+              // Capture the state reference for later use
+              _snapNameFieldState = state;
+            },
+          ),
+        ),
+        // Editable snap version (between name and arch).
+        const SizedBox(width: 16),
+        Text(
+          'Version:',
+          style: Theme.of(context).textTheme.headlineSmall
+                  ?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 130,
+          child: EditableTextField(
+            key: const ValueKey('snap-version-field'),
+            text: snapVersion ?? '',
+            onSave: (newVersion) {
+              _saveSnapVersionToFile(newVersion);
+            },
+            style: const TextStyle(fontSize: 16),
+            onStateCreated: (state) {
+              _snapVersionFieldState = state;
+            },
+          ),
+        ),
+        // Which architecture the loaded snap targets.
+        if (snapArchitectures.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: ArchBadge(architectures: snapArchitectures),
+          ),
+      ],
     );
   }
 }
