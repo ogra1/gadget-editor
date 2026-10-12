@@ -25,12 +25,20 @@ class LocalSnapLoader extends StatelessWidget {
         ),
         elevation: 0, // Remove elevation for cleaner look
       ),
+      // The label is Flexible so the Row never overflows when the button is
+      // narrower than its content (it ellipsizes instead of pushing the icon
+      // off the edge, which would trip the overflow error in tight layouts).
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.folder_open, size: 16),
           SizedBox(width: 8),
-          Text('Load Local Snap'),
+          Flexible(
+            child: Text(
+              'Load Local Snap',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

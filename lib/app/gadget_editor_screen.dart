@@ -35,13 +35,26 @@ void _cleanUpAndExit() {
 }
 
 class GadgetEditorScreen extends StatefulWidget {
-  const GadgetEditorScreen({super.key});
+  // Services are injected so the screen can be widget-tested with real
+  // (or faked) backends. main.dart constructs the production instances.
+  final SnapStoreService storeService;
+  final SnapFileService fileService;
+  final SnapPackService packService;
+
+  const GadgetEditorScreen({
+    super.key,
+    required this.storeService,
+    required this.fileService,
+    required this.packService,
+  });
 
   @override
-  State<GadgetEditorScreen> createState() => _GadgetEditorScreenState();
+  State<GadgetEditorScreen> createState() => GadgetEditorScreenState();
 }
 
-class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
+// Public (not underscore-prefixed) so widget tests can drive the loaded state
+// (e.g. call loadLocalGadgetSnap) and assert on the fields directly.
+class GadgetEditorScreenState extends State<GadgetEditorScreen> {
   String? snapName;
   String? gadgetContent;
   Map<String, dynamic>? gadgetData;
@@ -80,10 +93,6 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   // Reference to the version EditableTextField for reset functionality
   EditableTextFieldState? _snapVersionFieldState;
 
-  // Services backing the store, file and pack operations.
-  final SnapStoreService _storeService = SnapStoreService();
-  final SnapFileService _fileService = SnapFileService();
-  final SnapPackService _packService = SnapPackService();
 
   @override
   void initState() {
@@ -182,7 +191,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
     try {
       final channels =
-          await _storeService.searchGadgetChannels(snapName);
+          await widget.storeService.searchGadgetChannels(snapName);
 
       setState(() {
         availableChannels = channels;
@@ -215,7 +224,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       final fileName = path.basename(filePath);
       final extractPath = '${tempDirectoryPath!}/${fileName}_extracted';
       final extracted =
-          await _fileService.extractSnap(filePath, extractPath);
+          await widget.fileService.extractSnap(filePath, extractPath);
 
       // Extract snap name from filename (everything before first underscore)
       // if snap.yaml doesn't have it
@@ -288,7 +297,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
       // If we already extracted this channel, read directly from the cache.
       if (await Directory(extractPath).exists()) {
-        final extracted = await _fileService.readExtracted(extractPath);
+        final extracted = await widget.fileService.readExtracted(extractPath);
         setState(() {
           snapName = extracted.snapNameFromYaml.isNotEmpty
               ? extracted.snapNameFromYaml
@@ -306,9 +315,9 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       }
 
       // Download + extract.
-      final snapFile = await _storeService.downloadSnapFile(channel, path.dirname(filePath));
+      final snapFile = await widget.storeService.downloadSnapFile(channel, path.dirname(filePath));
       final extracted =
-          await _fileService.extractSnap(snapFile.path, extractPath);
+          await widget.fileService.extractSnap(snapFile.path, extractPath);
 
       setState(() {
         snapName = extracted.snapNameFromYaml.isNotEmpty
@@ -356,7 +365,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
       // Check if the directory already exists (cached version)
       if (await Directory(extractPath).exists()) {
-        final extracted = await _fileService.readExtracted(extractPath);
+        final extracted = await widget.fileService.readExtracted(extractPath);
         setState(() {
           snapName = extracted.snapNameFromYaml.isNotEmpty
               ? extracted.snapNameFromYaml
@@ -386,7 +395,8 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
     }
   }
   //  Function to save the edited snap name to the file with validation
-  Future<void> _saveSnapNameToFile(String newName) async {
+  // Synchronous on purpose (like GadgetYaml.save()): the metadata files are tiny, and sync I/O keeps the save deterministic under widget tests (no pending async tasks to settle).
+  void _saveSnapNameToFile(String newName) {
     final snapPath = snapFilePath;
     if (snapPath == null) {
       setState(() {
@@ -409,7 +419,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
     try {
       final file = File(snapPath);
-      final content = await file.readAsString();
+      final content = file.readAsStringSync();
 
       // Use yaml_edit to update just the name key, preserving the rest of the
       // file (including formatting and any unknown keys).
@@ -417,7 +427,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       yamlEditor.update(['name'], newName);
       final newYamlString = yamlEditor.toString();
 
-      await file.writeAsString(newYamlString);
+      file.writeAsStringSync(newYamlString);
 
       setState(() {
         snapName = newName;
@@ -431,7 +441,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
   }
   //  Save an edited snap version into meta/snap.yaml (inserting the key if
   //  it is absent). Mirrors [_saveSnapNameToFile].
-  Future<void> _saveSnapVersionToFile(String newVersion) async {
+  void _saveSnapVersionToFile(String newVersion) {
     final snapPath = snapFilePath;
     if (snapPath == null) {
       setState(() {
@@ -451,7 +461,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
     try {
       final file = File(snapPath);
-      final content = await file.readAsString();
+      final content = file.readAsStringSync();
 
       // Use yaml_edit to update just the version key, preserving the rest of
       // the file (including formatting and any unknown keys). yaml_edit
@@ -460,7 +470,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
       yamlEditor.update(['version'], trimmed);
       final newYamlString = yamlEditor.toString();
 
-      await file.writeAsString(newYamlString);
+      file.writeAsStringSync(newYamlString);
 
       setState(() {
         snapVersion = trimmed;
@@ -501,7 +511,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
         statusMessage = 'Packing snap...';
       });
 
-      final result = await _packService.packSnap(gadgetYamlPath, directory);
+      final result = await widget.packService.packSnap(gadgetYamlPath, directory);
 
       setState(() {
         statusMessage = result.snapFileName != null
@@ -718,6 +728,10 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                               ),
                               Flexible(
                                 child: EditableTextField(
+                                  // Key so widget tests can target the name
+                                  // field specifically (there are two such
+                                  // fields in the header).
+                                  key: const ValueKey('snap-name-field'),
                                   text: snapName ?? 'Unknown',
                                   onSave: (newName) {
                                     // Save to file when the user clicks save
@@ -744,6 +758,7 @@ class _GadgetEditorScreenState extends State<GadgetEditorScreen> {
                               SizedBox(
                                 width: 130,
                                 child: EditableTextField(
+                                  key: const ValueKey('snap-version-field'),
                                   text: snapVersion ?? '',
                                   onSave: (newVersion) {
                                     _saveSnapVersionToFile(newVersion);
