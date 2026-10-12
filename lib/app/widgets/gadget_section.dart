@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:yaru/yaru.dart';
 import 'package:yaml/yaml.dart';
 
 class GadgetSection extends StatelessWidget {
@@ -19,80 +21,147 @@ class GadgetSection extends StatelessWidget {
     this.sectionIndex,
   });
 
+  /// Section-specific identity icon. The three editable sections get
+  /// distinct Yaru glyphs so they are distinguishable at a glance; anything
+  /// else (e.g. Extras) falls back to a neutral "settings" outline.
+  static IconData sectionIconFor(String title) {
+    switch (title) {
+      case 'Defaults':
+        return YaruIcons.settings;
+      case 'Connections':
+        return YaruIcons.insert_link;
+      case 'Boot Options':
+        return YaruIcons.terminal;
+      default:
+        return YaruIcons.gear;
+    }
+  }
+
+  /// Caption shown in the empty state, per section.
+  String get _emptyCaption {
+    switch (title) {
+      case 'Defaults':
+        return 'No defaults yet. Add snap configuration entries.';
+      case 'Connections':
+        return 'No connections yet. Define snap plug/slot connections.';
+      case 'Boot Options':
+        return 'No boot options yet. Add kernel commandline options.';
+      default:
+        return 'No data';
+    }
+  }
+
+  /// Header row shared by the empty and populated states: a tinted icon chip
+  /// plus the title, with the add control on the right when applicable.
+  Widget _buildHeader(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(
+            sectionIconFor(title),
+            size: 20,
+            color: scheme.primary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (showEditButton && onEdit != null)
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            onPressed: onEdit,
+            tooltip: 'Add $title',
+          ),
+      ],
+    );
+  }
+
+  /// Dashed rounded-rectangle border used by the empty state. Drawn with a
+  /// CustomPainter so no extra package is needed.
+  Widget _buildEmptyState(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final VoidCallback? addOnEdit =
+        (showEditButton && onEdit != null) ? onEdit : null;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: CustomPaint(
+        // Key so tests can assert on the dashed drop-zone specifically
+        // (Yaru's theming injects its own CustomPaints into the tree).
+        key: const ValueKey('gadget-section-dashed-zone'),
+        painter: _DashedBorder(
+          color: scheme.outline,
+          radius: 10,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Icon(
+                sectionIconFor(title),
+                size: 30,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _emptyCaption,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              if (addOnEdit != null) ...[
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: addOnEdit,
+                  icon: const Icon(YaruIcons.plus, size: 18),
+                  label: Text('Add $title'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (data == null || (data is YamlMap && data.isEmpty) || (data is List && data.isEmpty)) {
-      return Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).dividerColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (showEditButton && onEdit != null)
-                  IconButton(
-                    icon: const Icon(Icons.add, size: 16),
-                    onPressed: onEdit,
-                    tooltip: 'Add $title',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (title == 'Defaults')
-              const Text('Click the add icon for new snap configuration.')
-            else if (title == 'Connections')
-              const Text('Click the add icon to define snap connections.')
-            else if (title == 'Boot Options')
-              const Text('Click the add icon to add kernel commandline options.')
-            else
-              const Text('No data'),
-          ],
-        ),
-      );
-    }
+    final isEmpty =
+        data == null || (data is YamlMap && data.isEmpty) || (data is List && data.isEmpty);
+
+    final Widget body = isEmpty
+        ? _buildEmptyState(context)
+        : _buildSectionContent(context, data);
 
     return Container(
       decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
         border: Border.all(color: Theme.of(context).dividerColor),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (showEditButton && onEdit != null)
-                  IconButton(
-                    icon: const Icon(Icons.add, size: 16),
-                    onPressed: onEdit,
-                    tooltip: 'Add $title',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _buildSectionContent(context, data),
+            _buildHeader(context),
+            body,
           ],
         ),
       ),
@@ -632,4 +701,91 @@ class GadgetSection extends StatelessWidget {
       },
     );
   }
+}
+
+/// Draws a dashed rounded-rectangle stroke.
+class _DashedBorder extends CustomPainter {
+  static const double _strokeWidth = 1.4;
+  static const List<double> _dash = [6.0, 5.0];
+
+  final Color color;
+  final double radius;
+
+  const _DashedBorder({
+    required this.color,
+    required this.radius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = radius.clamp(0.0, size.shortestSide / 2);
+    const half = _strokeWidth / 2;
+    final right = size.width - half;
+    final bottom = size.height - half;
+
+    // Perimeter as (start, end) straight segments plus the four corner arcs.
+    final segments = <List<Offset>>[
+      [const Offset(half, half), Offset(right - r, half)], // top edge
+      [Offset(right, half + r), Offset(right, bottom - r)], // right edge
+      [Offset(right - r, bottom), Offset(half + r, bottom)], // bottom edge
+      [Offset(half, bottom - r), Offset(half, half + r)], // left edge
+    ];
+    final arcs = <Rect>[
+      Rect.fromLTWH(right - 2 * r, half, 2 * r, 2 * r), // top-right
+      Rect.fromLTWH(half, bottom - 2 * r, 2 * r, 2 * r), // bottom-left
+    ];
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _strokeWidth;
+
+    var gap = false; // whether the next bit of path is a gap
+    final path = Path();
+
+    void dashSegment(Offset a, Offset b, double len) {
+      for (var t = 0.0; t < len; ) {
+        final segLen = (gap ? _dash[1] : _dash[0]).clamp(0.0, len - t);
+        if (!gap) {
+          final a2 = Offset.lerp(a, b, t / len)!;
+          final b2 = Offset.lerp(a, b, (t + segLen) / len)!;
+          path.moveTo(a2.dx, a2.dy);
+          path.lineTo(b2.dx, b2.dy);
+        }
+        t += segLen;
+        gap = !gap;
+      }
+    }
+
+    for (final seg in segments) {
+      dashSegment(seg[0], seg[1], (seg[0] - seg[1]).distance);
+    }
+    // Corner arcs (each quarter of a 2r-diameter circle).
+    for (final rect in arcs) {
+      final quarter = 3.141592653589793 * r / 2;
+      // Walk each arc in small steps so the dash pattern follows the curve.
+      const steps = 12;
+      for (var i = 0; i < steps; i++) {
+        final t0 = i / steps * quarter;
+        final t1 = (i + 1) / steps * quarter;
+        final p0 = _arcPoint(rect, t0);
+        final p1 = _arcPoint(rect, t1);
+        dashSegment(p0, p1, (p0 - p1).distance);
+      }
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  // Point on the quarter-circle centred in [rect] at [t] radians (0..pi/2)
+  // measured from the top, clockwise.
+  Offset _arcPoint(Rect rect, double t) {
+    final cx = rect.center.dx;
+    final cy = rect.center.dy;
+    final rr = rect.width / 2;
+    return Offset(cx + rr * math.sin(t), cy - rr * math.cos(t));
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorder old) =>
+      old.color != color || old.radius != radius;
 }
