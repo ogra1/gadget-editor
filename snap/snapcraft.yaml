@@ -10,7 +10,8 @@ description: |
     - apply default configurations for snap packages seeded in the image
     - manage kernel command-line parameters
     - change the image file name in the volume definition
-    - and indeed change the name of the snap itself
+    - Add an API Key for a dedicated store
+    - and indeed change the name and version of the snap itself
 
   You can search and download existing gadget snaps from the global store with
   the built in search function or import a local gadget snap file to edit it.
@@ -35,6 +36,7 @@ website: https://github.com/ogra1/gadget-editor
 
 confinement: strict
 grade: stable
+compression: lzo
 
 base: core24
 
