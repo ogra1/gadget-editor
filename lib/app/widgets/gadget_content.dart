@@ -9,6 +9,7 @@ import 'gadget_volumes.dart';
 import 'simple_connections_editor.dart';
 import 'simple_defaults_editor.dart';
 import 'simple_kernel_cmdline_editor.dart';
+import 'simple_slots_editor.dart';
 
 /// Displays the content of a gadget.yaml.
 ///
@@ -44,7 +45,6 @@ class GadgetContent extends StatefulWidget {
 }
 
 class _GadgetContentState extends State<GadgetContent> {
-
   /// Creates/ensures the prepare-device hook script next to snap.yaml.
   final PrepareDeviceHookService _hookService = PrepareDeviceHookService();
   Map<String, dynamic> _yamlData = const {};
@@ -210,6 +210,41 @@ class _GadgetContentState extends State<GadgetContent> {
           ),
           const SizedBox(height: 16),
 
+          // Slots Section (snap.yaml, not gadget.yaml). Slots are interface
+          // declarations of the gadget snap itself, so the section only
+          // appears once a snap.yaml is available (it is, for every
+          // downloaded or locally loaded gadget).
+          if (widget.snapFilePath != null) ...[
+            GadgetSection(
+              title: 'Slots',
+              data: _slotsNode(),
+              onEdit: () {
+                SimpleSlotsEditor.show(
+                  context,
+                  snapFilePath: widget.snapFilePath,
+                  onSaved: _refreshContentFromFile,
+                  onStatusUpdate: widget.onStatusUpdate,
+                );
+              },
+              onEditEntry: (data, name) {
+                SimpleSlotsEditor.show(
+                  context,
+                  snapFilePath: widget.snapFilePath,
+                  onSaved: _refreshContentFromFile,
+                  onStatusUpdate: widget.onStatusUpdate,
+                  name: name.toString(),
+                  initialAttributes: (data is Map && data[name] is Map)
+                      ? Map<String, dynamic>.from(data[name] as Map)
+                      : null,
+                );
+              },
+              onDelete: (data, index) {
+                _deleteSlot(data, index);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // Show the Extras section whenever the document has keys the editor
           // does not have a dedicated section for. It is not architecture-
           // dependent.
@@ -293,6 +328,36 @@ class _GadgetContentState extends State<GadgetContent> {
     );
   }
 
+  /// Removes the slot [index] (the slot name reported by the card) from
+  /// `meta/snap.yaml`.
+  void _deleteSlot(dynamic data, Object? index) {
+    final name = index?.toString();
+    if (name == null || name.isEmpty) {
+      _status('Error deleting slot: unknown position');
+      return;
+    }
+    _mutate(
+      (yaml) => yaml.removeSlot(name),
+      'Slot deleted successfully',
+      'Error deleting slot: ',
+      filePathOverride: widget.snapFilePath,
+    );
+  }
+
+  /// The `slots` node of `meta/snap.yaml`, or `null` when the section is
+  /// absent or the snap.yaml cannot be read (the section then renders its
+  /// empty state).
+  dynamic _slotsNode() {
+    final path = widget.snapFilePath;
+    if (path == null) return null;
+    try {
+      final yaml = GadgetYaml.fromFile(path);
+      return yaml.nodeAt(const ['slots']);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Runs [edit] against a fresh [GadgetYaml] loaded from the backing file,
   /// persists it and refreshes the rendered content. All error reporting and
   /// the read-edit-write ritual lives here so the individual delete
@@ -300,9 +365,10 @@ class _GadgetContentState extends State<GadgetContent> {
   void _mutate(
     void Function(GadgetYaml yaml) edit,
     String successMessage,
-    String errorPrefix,
-  ) {
-    final filePath = widget.filePath;
+    String errorPrefix, {
+    String? filePathOverride,
+  }) {
+    final filePath = filePathOverride ?? widget.filePath;
     if (filePath == null) {
       _status('$errorPrefix no file loaded');
       return;

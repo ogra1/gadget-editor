@@ -8,7 +8,12 @@ class GadgetSection extends StatelessWidget {
   final dynamic data;
   final VoidCallback? onEdit;
   final bool showEditButton;
-  final Function(dynamic, Object?)? onDelete; // Add delete callback (kernel-cmdline passes [section, index])
+  final Function(dynamic, Object?)?
+      onDelete; // Add delete callback (kernel-cmdline passes [section, index])
+
+  /// Opens the per-card editor (Slots only for now).
+  final Function(dynamic, Object?)? onEditEntry;
+
   final int? sectionIndex; // Add section index for tracking
 
   const GadgetSection({
@@ -18,6 +23,7 @@ class GadgetSection extends StatelessWidget {
     this.onEdit,
     this.showEditButton = true,
     this.onDelete,
+    this.onEditEntry,
     this.sectionIndex,
   });
 
@@ -32,6 +38,8 @@ class GadgetSection extends StatelessWidget {
         return YaruIcons.insert_link;
       case 'Boot Options':
         return YaruIcons.terminal;
+      case 'Slots':
+        return YaruIcons.puzzle_piece;
       default:
         return YaruIcons.gear;
     }
@@ -46,6 +54,8 @@ class GadgetSection extends StatelessWidget {
         return 'No connections yet. Define snap plug/slot connections.';
       case 'Boot Options':
         return 'No boot options yet. Add kernel commandline options.';
+      case 'Slots':
+        return 'No slots yet. Declare snap interface slots.';
       default:
         return 'No data';
     }
@@ -150,8 +160,9 @@ class GadgetSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isEmpty =
-        data == null || (data is YamlMap && data.isEmpty) || (data is List && data.isEmpty);
+    final isEmpty = data == null ||
+        (data is YamlMap && data.isEmpty) ||
+        (data is List && data.isEmpty);
 
     final Widget body = isEmpty
         ? _buildEmptyState(context)
@@ -196,6 +207,11 @@ class GadgetSection extends StatelessWidget {
     // Special handling for kernel cmdline to group by allow/append/remove
     if (title == 'Boot Options') {
       return _buildKernelCmdlineContent(context, data);
+    }
+
+    // Special handling for slots (snap.yaml): one card per slot
+    if (title == 'Slots') {
+      return _buildSlotsContent(context, data);
     }
 
     // Handle single key-value maps specially
@@ -243,7 +259,8 @@ class GadgetSection extends StatelessWidget {
               const SizedBox(height: 4),
               // Add indentation to the content
               Container(
-                margin: const EdgeInsets.only(left: 16), // This creates the indentation
+                margin: const EdgeInsets.only(
+                    left: 16), // This creates the indentation
                 child: _buildValueWidget(context, value),
               ),
               const SizedBox(height: 12),
@@ -275,7 +292,8 @@ class GadgetSection extends StatelessWidget {
               const SizedBox(height: 4),
               // Add indentation to the content
               Container(
-                margin: const EdgeInsets.only(left: 16), // This creates the indentation
+                margin: const EdgeInsets.only(
+                    left: 16), // This creates the indentation
                 child: _buildValueWidget(context, item),
               ),
               const SizedBox(height: 12),
@@ -387,10 +405,12 @@ class GadgetSection extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).cardColor,
-                                border: Border.all(color: Theme.of(context).dividerColor),
+                                border: Border.all(
+                                    color: Theme.of(context).dividerColor),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -406,7 +426,8 @@ class GadgetSection extends StatelessWidget {
                             IconButton(
                               icon: const Icon(Icons.delete, size: 16),
                               onPressed: () {
-                                _showDeleteConfirmationDialog(context, 'Kernel parameter', [group.key, i]);
+                                _showDeleteConfirmationDialog(context,
+                                    'Kernel parameter', [group.key, i]);
                               },
                               tooltip: 'Delete parameter',
                             ),
@@ -475,30 +496,37 @@ class GadgetSection extends StatelessWidget {
                               Container(
                                 width: 40, // Fixed width to ensure alignment
                                 alignment: Alignment.centerLeft,
-                                child: const Text('Plug: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                child: const Text('Plug: ',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
                               ),
                               Expanded(
                                 child: Text(
                                   // Combined on-disk format: <snap id>:<interface>.
                                   connection['plug']?.toString() ?? 'N/A',
-                                  style: const TextStyle(fontFamily: 'monospace'),
+                                  style:
+                                      const TextStyle(fontFamily: 'monospace'),
                                 ),
                               ),
                             ],
                           ),
                           // Slot line - only show if slot is defined
-                          if (connection['slot'] != null && connection['slot'] != '')
+                          if (connection['slot'] != null &&
+                              connection['slot'] != '')
                             Row(
                               children: [
                                 Container(
                                   width: 40, // Fixed width to ensure alignment
                                   alignment: Alignment.centerLeft,
-                                  child: const Text('Slot: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  child: const Text('Slot: ',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
                                 ),
                                 Expanded(
                                   child: Text(
                                     connection['slot'].toString(),
-                                    style: const TextStyle(fontFamily: 'monospace'),
+                                    style: const TextStyle(
+                                        fontFamily: 'monospace'),
                                   ),
                                 ),
                               ],
@@ -510,7 +538,8 @@ class GadgetSection extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.delete, size: 16),
                         onPressed: () {
-                          _showDeleteConfirmationDialog(context, 'Connection', index);
+                          _showDeleteConfirmationDialog(
+                              context, 'Connection', index);
                         },
                         tooltip: 'Delete connection',
                       ),
@@ -560,8 +589,11 @@ class GadgetSection extends StatelessWidget {
                         // Display the main key (snap ID or system) with improved styling
                         Row(
                           children: [
-                            const Text('Snap: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text('$key', style: const TextStyle(fontWeight: FontWeight.normal)),
+                            const Text('Snap: ',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text('$key',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.normal)),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -574,7 +606,8 @@ class GadgetSection extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.delete, size: 16),
                       onPressed: () {
-                        _showDeleteConfirmationDialog(context, 'Default', entryIndex);
+                        _showDeleteConfirmationDialog(
+                            context, 'Default', entryIndex);
                       },
                       tooltip: 'Delete default',
                     ),
@@ -603,7 +636,8 @@ class GadgetSection extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor, // Use theme-appropriate background
+          color:
+              Theme.of(context).cardColor, // Use theme-appropriate background
           border: Border.all(color: Theme.of(context).dividerColor),
           borderRadius: BorderRadius.circular(4),
         ),
@@ -612,7 +646,8 @@ class GadgetSection extends StatelessWidget {
           style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 12,
-            color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black, // Use theme text color
+            color: Theme.of(context).textTheme.bodyMedium?.color ??
+                Colors.black, // Use theme text color
           ),
         ),
       );
@@ -682,7 +717,106 @@ class GadgetSection extends StatelessWidget {
     return Text('$value');
   }
 
-  void _showDeleteConfirmationDialog(BuildContext context, String title, Object? index) {
+  Widget _buildSlotsContent(BuildContext context, dynamic data) {
+    // Slots live in snap.yaml (not gadget.yaml), so they only exist for a
+    // file-backed document.
+    if (data == null) {
+      return const Text('No slots defined.');
+    }
+    if (data is YamlMap && data.isEmpty) {
+      return const Text('No slots defined.');
+    }
+    if (data is! YamlMap) {
+      return Text('$data');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: data.entries.map((entry) {
+        final name = entry.key.toString();
+        final attributes = entry.value is Map
+            ? Map<String, String>.fromEntries((entry.value as Map).entries.map(
+                (e) => MapEntry(e.key.toString(), e.value?.toString() ?? '')))
+            : const <String, String>{};
+        final interface = attributes['interface'] ?? 'N/A';
+        final extras =
+            attributes.entries.where((e) => e.key != 'interface').toList();
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text('Slot: ',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(fontFamily: 'monospace'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Text('Interface: ',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          Expanded(
+                            child: Text(interface,
+                                style:
+                                    const TextStyle(fontFamily: 'monospace')),
+                          ),
+                        ],
+                      ),
+                      for (final extra in extras)
+                        Row(
+                          children: [
+                            const Text('  ',
+                                style: TextStyle(fontFamily: 'monospace')),
+                            Expanded(
+                              child: Text(
+                                '${extra.key}: ${extra.value}',
+                                style: const TextStyle(
+                                    fontFamily: 'monospace', fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                if (onEditEntry != null)
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 16),
+                    tooltip: 'Edit slot',
+                    onPressed: () {
+                      onEditEntry!(data, name);
+                    },
+                  ),
+                if (onDelete != null)
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 16),
+                    tooltip: 'Delete slot',
+                    onPressed: () {
+                      _showDeleteConfirmationDialog(context, 'Slot', name);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(
+      BuildContext context, String title, Object? index) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -754,7 +888,7 @@ class _DashedBorder extends CustomPainter {
     final path = Path();
 
     void dashSegment(Offset a, Offset b, double len) {
-      for (var t = 0.0; t < len; ) {
+      for (var t = 0.0; t < len;) {
         final segLen = (gap ? _dash[1] : _dash[0]).clamp(0.0, len - t);
         if (!gap) {
           final a2 = Offset.lerp(a, b, t / len)!;

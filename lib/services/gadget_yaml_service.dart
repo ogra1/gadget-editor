@@ -68,10 +68,9 @@ class GadgetYamlException extends FormatException {
   GadgetYamlException(super.message, [this.cause]);
 
   @override
-  String toString() =>
-      cause == null
-          ? 'GadgetYamlException: $message'
-          : 'GadgetYamlException: $message (caused by: $cause)';
+  String toString() => cause == null
+      ? 'GadgetYamlException: $message'
+      : 'GadgetYamlException: $message (caused by: $cause)';
 }
 
 /// A single, mutable gadget.yaml document.
@@ -324,10 +323,8 @@ class GadgetYaml {
     }
     var docStep = 2;
     if (firstChildKey != null) {
-      final firstChildLine = docText
-          .substring(firstChildKey.span.start.offset)
-          .split('\n')
-          .first;
+      final firstChildLine =
+          docText.substring(firstChildKey.span.start.offset).split('\n').first;
       final childIndent =
           firstChildLine.length - firstChildLine.trimLeft().length;
       if (childIndent > keyIndent) docStep = childIndent - keyIndent;
@@ -682,8 +679,8 @@ class GadgetYaml {
       throw GadgetYamlException(
           "No partition named '$partitionName' in volume '$volumeName'");
     }
-    _guard(() => _editor.update(
-        ['volumes', volumeName, 'structure', index, 'size'], size));
+    _guard(() => _editor
+        .update(['volumes', volumeName, 'structure', index, 'size'], size));
   }
 
   /// Renames the top-level volume [oldName] to [newName], preserving the
@@ -707,8 +704,9 @@ class GadgetYaml {
       // Insert the new key at the end of the volumes map (an in-place
       // yaml_edit update would sort it into position and reorder the
       // file), then drop the old one. The map is never empty mid-operation.
-      _insertNewKey(const ['volumes'],
-          YamlMapWrap({newName: value}, collectionStyle: CollectionStyle.BLOCK));
+      _insertNewKey(const [
+        'volumes'
+      ], YamlMapWrap({newName: value}, collectionStyle: CollectionStyle.BLOCK));
       _editor.remove(['volumes', oldName]);
     });
   }
@@ -719,7 +717,8 @@ class GadgetYaml {
   /// The `prepare-device` hook runs on first boot of an Ubuntu Core system
   /// and uses this key to onboard the device to a store.
   String? getApiKey() {
-    final node = nodeAt(const ['hooks', 'prepare-device', 'environment', 'MODEL_APIKEY']);
+    final node = nodeAt(
+        const ['hooks', 'prepare-device', 'environment', 'MODEL_APIKEY']);
     return node?.value?.toString();
   }
 
@@ -729,8 +728,152 @@ class GadgetYaml {
   ///
   /// Routes through [update] so any missing intermediate maps are created in
   /// block style and the existing file order is preserved.
-  void setApiKey(String key) =>
-      update(const ['hooks', 'prepare-device', 'environment', 'MODEL_APIKEY'], key);
+  void setApiKey(String key) => update(
+      const ['hooks', 'prepare-device', 'environment', 'MODEL_APIKEY'], key);
+
+  // ---------------------------------------------------------------------
+  // Slot (snap.yaml) operations
+  //
+  // Slots are snap-level interface declarations that live in
+  // meta/snap.yaml (copied verbatim from the gadget's snapcraft.yaml at
+  // build time), not in gadget.yaml. The same [GadgetYaml] instance edits
+  // both files, so these helpers act on whichever document the instance
+  // was constructed from.
+  // ---------------------------------------------------------------------
+
+  /// The `slots` map: slot name → attribute map (`interface` plus any
+  /// interface-specific scalar extras such as `path`, `number`,
+  /// `chip-number` or `channel`).
+  ///
+  /// Returns an empty map when the `slots` section is absent, null or not
+  /// a map. Attribute order within each slot is preserved.
+  Map<String, dynamic> getSlots() {
+    final node = nodeAt(const ['slots']);
+    if (node is! YamlMap) return const <String, dynamic>{};
+    return _convert(node) as Map<String, dynamic>;
+  }
+
+  /// Adds a slot declaration to the top-level `slots` map, creating the
+  /// section (at the end of the document) on demand.
+  ///
+  /// [attributes] must contain a non-empty string `interface` plus any
+  /// number of interface-specific scalar extras. Throws
+  /// [GadgetYamlException] for an invalid [name], a missing or empty
+  /// `interface`, an invalid attribute name, a non-scalar attribute value,
+  /// or when a slot named [name] already exists (use [setSlot] to replace
+  /// an existing slot).
+  void addSlot(String name, Map<String, dynamic> attributes) {
+    _validateSlotName(name);
+    final clean = _validateSlotAttributes(attributes);
+    if (has(['slots', name])) {
+      throw GadgetYamlException("A slot named '$name' already exists");
+    }
+    update(['slots', name], clean);
+  }
+
+  /// Replaces the attribute map of the existing slot [name], keeping the
+  /// slot's position in the `slots` map.
+  ///
+  /// [attributes] follows the same rules as in [addSlot]. Attributes that
+  /// are not passed again are dropped. Throws [GadgetYamlException] if the
+  /// slot does not exist (use [addSlot] to create it) or the attributes
+  /// are invalid.
+  void setSlot(String name, Map<String, dynamic> attributes) {
+    _validateSlotName(name);
+    final clean = _validateSlotAttributes(attributes);
+    final slots = nodeAt(const ['slots']);
+    if (slots is! YamlMap || !slots.containsKey(name)) {
+      throw GadgetYamlException(
+          "No slot named '$name' (use addSlot to create it)");
+    }
+    _guard(() => _editor.update(['slots', name], _blockNode(clean)));
+  }
+
+  /// Removes the slot [name] from the top-level `slots` map.
+  ///
+  /// When the last slot is removed the whole `slots` section is pruned as
+  /// well. Throws [GadgetYamlException] if the section or [name] does not
+  /// exist.
+  void removeSlot(String name) {
+    final slots = nodeAt(const ['slots']);
+    if (slots is! YamlMap || !slots.containsKey(name)) {
+      throw GadgetYamlException(slots == null
+          ? "No 'slots' section in snap YAML"
+          : "No slot named '$name'");
+    }
+    _guard(() {
+      _editor.remove(['slots', name]);
+      if (_isEmptyMapAt(const ['slots'])) _editor.remove(const ['slots']);
+    });
+  }
+
+  /// Renames the slot [oldName] to [newName], preserving its attributes.
+  ///
+  /// The renamed slot moves to the *end* of the `slots` map (mirroring
+  /// [renameVolume]). No-op when [oldName] equals [newName]. Throws
+  /// [GadgetYamlException] if [oldName] does not exist, [newName] is
+  /// invalid, or a slot named [newName] already exists.
+  void renameSlot(String oldName, String newName) {
+    if (oldName == newName) return;
+    _validateSlotName(newName);
+    final slots = nodeAt(const ['slots']);
+    if (slots is! YamlMap || !slots.containsKey(oldName)) {
+      throw GadgetYamlException("No slot named '$oldName'");
+    }
+    if (slots.containsKey(newName)) {
+      throw GadgetYamlException("A slot named '$newName' already exists");
+    }
+    _guard(() {
+      final value = _editor.parseAt(['slots', oldName]);
+      _insertNewKey(const [
+        'slots'
+      ], YamlMapWrap({newName: value}, collectionStyle: CollectionStyle.BLOCK));
+      _editor.remove(['slots', oldName]);
+    });
+  }
+
+  /// Slot names follow the same conservative shape as snap names: letters,
+  /// digits, '.', '_' and '-', starting with a letter or digit
+  /// (real-world names: `bcm-gpio-512`, `i2c-0`, `bt-serial`, `pwm0`).
+  static final RegExp _slotNamePattern =
+      RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]*$');
+
+  void _validateSlotName(String name) {
+    if (name.isEmpty) {
+      throw GadgetYamlException('Slot name must not be empty');
+    }
+    if (!_slotNamePattern.hasMatch(name)) {
+      throw GadgetYamlException(
+          "Invalid slot name '$name' (allowed: letters, digits, '.', '_' "
+          "and '-', starting with a letter or digit)");
+    }
+  }
+
+  /// Validates a free-form slot attribute map: a non-empty string
+  /// `interface` plus any number of interface-specific *scalar* extras.
+  /// Returns the entries (in their original order) ready for insertion.
+  Map<String, dynamic> _validateSlotAttributes(
+      Map<String, dynamic> attributes) {
+    final interfaceValue = attributes['interface'];
+    if (interfaceValue is! String || interfaceValue.isEmpty) {
+      throw GadgetYamlException(
+          "A slot requires a non-empty string 'interface' attribute");
+    }
+    final clean = <String, dynamic>{};
+    attributes.forEach((key, value) {
+      if (!_slotNamePattern.hasMatch(key)) {
+        throw GadgetYamlException(
+            "Invalid slot attribute name '$key' (allowed: letters, digits, "
+            "'.', '_' and '-', starting with a letter or digit)");
+      }
+      if (value is List || value is Map) {
+        throw GadgetYamlException(
+            "Slot attribute '$key' must be a scalar value");
+      }
+      clean[key] = value;
+    });
+    return clean;
+  }
 
   /// Removes the top-level volume [name] entirely.
   // ---------------------------------------------------------------------
@@ -769,7 +912,8 @@ class GadgetYaml {
         _editor.update(prefix, body);
       } else {
         // The key is absent: append it at the end of the parent map.
-        _insertNewKey(parentPath,
+        _insertNewKey(
+            parentPath,
             YamlMapWrap({prefix.last: body},
                 collectionStyle: CollectionStyle.BLOCK));
       }

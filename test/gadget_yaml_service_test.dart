@@ -102,7 +102,8 @@ void main() {
     });
 
     test('adds the name key when absent', () {
-      final gadget = GadgetYaml.fromContent('defaults:\n  core22:\n    hold: true\n');
+      final gadget =
+          GadgetYaml.fromContent('defaults:\n  core22:\n    hold: true\n');
       gadget.setSnapName('pc');
       final out = gadget.toYaml();
       expect(out, contains('name: pc'));
@@ -171,27 +172,33 @@ volumes:
   });
 
   group('setDefault', () {
-    test('creates the defaults section and dot-separated nesting on demand', () {
+    test('creates the defaults section and dot-separated nesting on demand',
+        () {
       final gadget = GadgetYaml.fromContent('name: pc\n');
       gadget.setDefault('core20', 'foo.bar.baz', 'x');
-      expect(gadget.valueAt(const ['defaults', 'core20', 'foo', 'bar', 'baz']), 'x');
+      expect(gadget.valueAt(const ['defaults', 'core20', 'foo', 'bar', 'baz']),
+          'x');
       // A missing top-level section is appended at the end of the document,
       // never re-sorted above the existing keys.
       expect(gadget.toYaml(),
           'name: pc\ndefaults:\n  core20:\n    foo:\n      bar:\n        baz: x\n');
     });
 
-    test('appends a new top-level section after the last section, preserving order', () {
+    test(
+        'appends a new top-level section after the last section, preserving order',
+        () {
       // name is alphabetically after defaults; the section must still land
       // at the end (the bug this guards: yaml_edit would sort it to the top).
-      final gadget = GadgetYaml.fromContent('name: pc\nvolumes:\n  pc:\n    size: 1G\n');
+      final gadget =
+          GadgetYaml.fromContent('name: pc\nvolumes:\n  pc:\n    size: 1G\n');
       gadget.setDefault('core20', 'foo', 'bar');
       expect(gadget.toYaml(),
           'name: pc\nvolumes:\n  pc:\n    size: 1G\ndefaults:\n  core20:\n    foo: bar\n');
     });
 
     test('appends a new key at the end of a nested map too', () {
-      final gadget = GadgetYaml.fromContent('volumes:\n  pc:\n    size: 1G\n    structure:\n      - name: root\n        size: 5G\n');
+      final gadget = GadgetYaml.fromContent(
+          'volumes:\n  pc:\n    size: 1G\n    structure:\n      - name: root\n        size: 5G\n');
       gadget.update(['volumes', 'pc', 'image'], 'image.raw');
       expect(gadget.toYaml(),
           'volumes:\n  pc:\n    size: 1G\n    structure:\n      - name: root\n        size: 5G\n    image: image.raw\n');
@@ -201,12 +208,13 @@ volumes:
       final gadget = GadgetYaml.fromContent('a: 1\ndefaults:\nb: 2\n');
       gadget.setDefault('core20', 'x', 'y');
       // defaults keeps its middle position; only its value appears.
-      expect(gadget.toYaml(),
-          'a: 1\ndefaults:\n  core20:\n    x: y\nb: 2\n');
+      expect(gadget.toYaml(), 'a: 1\ndefaults:\n  core20:\n    x: y\nb: 2\n');
     });
 
-    test('appends a new section when the last entry has a trailing comment', () {
-      final gadget = GadgetYaml.fromContent('name: pc\nvolumes: # disks\n  pc:\n    size: 1G\n');
+    test('appends a new section when the last entry has a trailing comment',
+        () {
+      final gadget = GadgetYaml.fromContent(
+          'name: pc\nvolumes: # disks\n  pc:\n    size: 1G\n');
       gadget.setDefault('core20', 'x', 'y');
       expect(gadget.toYaml(),
           'name: pc\nvolumes: # disks\n  pc:\n    size: 1G\ndefaults:\n  core20:\n    x: y\n');
@@ -215,10 +223,13 @@ volumes:
     test('updates an existing leaf without touching siblings', () {
       final gadget = GadgetYaml.fromContent(fixture);
       gadget.setDefault('core20', 'refresh-motivation', 'eager');
-      expect(gadget.valueAt(const ['defaults', 'core20', 'refresh-motivation']), 'eager');
+      expect(gadget.valueAt(const ['defaults', 'core20', 'refresh-motivation']),
+          'eager');
       expect(gadget.valueAt(const ['defaults', 'core22', 'hold']), true);
-      expect(gadget.toYaml(),
-          fixture.replaceFirst('refresh-motivation: timely', 'refresh-motivation: eager'));
+      expect(
+          gadget.toYaml(),
+          fixture.replaceFirst(
+              'refresh-motivation: timely', 'refresh-motivation: eager'));
     });
 
     test('adds a nested key under an existing snap, keeping sibling keys', () {
@@ -226,8 +237,10 @@ volumes:
       gadget.setDefault('core22', 'nested.new', 42);
       expect(gadget.valueAt(const ['defaults', 'core22', 'nested', 'new']), 42);
       expect(gadget.valueAt(const ['defaults', 'core22', 'hold']), true);
-      expect(gadget.toYaml(),
-          fixture.replaceFirst('    hold: true\n', '    hold: true\n    nested:\n      new: 42\n'));
+      expect(
+          gadget.toYaml(),
+          fixture.replaceFirst('    hold: true\n',
+              '    hold: true\n    nested:\n      new: 42\n'));
     });
 
     test('stores a literal multiline scalar in block style', () {
@@ -235,13 +248,17 @@ volumes:
       gadget.setDefault('core20', 'multi',
           wrapAsYamlNode('line1\nline2', scalarStyle: ScalarStyle.LITERAL));
       expect(gadget.toYaml().contains('multi: |'), isTrue);
-      expect(gadget.valueAt(const ['defaults', 'core20', 'multi']), 'line1\nline2');
+      expect(gadget.valueAt(const ['defaults', 'core20', 'multi']),
+          'line1\nline2');
     });
 
     test('replaces a scalar when the key path extends it', () {
       final gadget = GadgetYaml.fromContent(fixture);
       gadget.setDefault('core20', 'refresh-motivation.detail', 'x');
-      expect(gadget.valueAt(const ['defaults', 'core20', 'refresh-motivation', 'detail']), 'x');
+      expect(
+          gadget.valueAt(
+              const ['defaults', 'core20', 'refresh-motivation', 'detail']),
+          'x');
     });
 
     test('rejects an empty snap ID or empty dot-separated key part', () {
@@ -271,14 +288,16 @@ connections:
     });
 
     test('prunes the emptied connections section', () {
-      final gadget = GadgetYaml.fromContent('connections:\n  - interface: serial\n');
+      final gadget =
+          GadgetYaml.fromContent('connections:\n  - interface: serial\n');
       gadget.removeConnection(0);
       final out = gadget.toYaml();
       expect(out, isNot(contains('connections')));
     });
 
     test('throws on out-of-bounds index', () {
-      final gadget = GadgetYaml.fromContent('connections:\n  - interface: serial\n');
+      final gadget =
+          GadgetYaml.fromContent('connections:\n  - interface: serial\n');
       expect(() => gadget.removeConnection(5),
           throwsA(isA<GadgetYamlException>()));
       expect(() => gadget.removeConnection(-1),
@@ -294,7 +313,8 @@ connections:
 
   group('addConnection', () {
     test('creates the missing section at the end of the document', () {
-      final gadget = GadgetYaml.fromContent('name: pc\nvolumes:\n  pc:\n    size: 1G\n');
+      final gadget =
+          GadgetYaml.fromContent('name: pc\nvolumes:\n  pc:\n    size: 1G\n');
       gadget.addConnection({'interface': 'serial'});
       expect(gadget.toYaml(),
           'name: pc\nvolumes:\n  pc:\n    size: 1G\nconnections:\n  - interface: serial\n');
@@ -314,8 +334,7 @@ connections:
       final out = gadget.toYaml();
       expect(out, contains('interface: serial'));
       expect(out, contains('interface: usb'));
-      expect(
-          out.indexOf('interface: serial') < out.indexOf('interface: usb'),
+      expect(out.indexOf('interface: serial') < out.indexOf('interface: usb'),
           isTrue);
       expect(gadget.valueAt(const ['connections', 1, 'plug']), 'modem1');
       final slots = gadget.valueAt(const ['connections', 1, 'slots']);
@@ -357,7 +376,8 @@ connections:
     });
 
     test('prunes the whole kernel-cmdline section when fully empty', () {
-      final gadget = GadgetYaml.fromContent('kernel-cmdline:\n  allow:\n    - x\n');
+      final gadget =
+          GadgetYaml.fromContent('kernel-cmdline:\n  allow:\n    - x\n');
       final levels = gadget.removeKernelCmdlineItem('allow', 0);
       expect(levels, 3);
       expect(gadget.toYaml(), '');
@@ -394,7 +414,8 @@ connections:
       final out = gadget.toYaml();
       expect(out, contains('kernel-cmdline:'));
       expect(out, contains('console=ttyS0'));
-      expect(gadget.valueAt(const ['kernel-cmdline', 'allow', 0]), 'console=ttyS0');
+      expect(gadget.valueAt(const ['kernel-cmdline', 'allow', 0]),
+          'console=ttyS0');
     });
 
     test('appends a missing sub-section at the end of the section', () {
@@ -432,16 +453,14 @@ connections:
 
     test('throws for unknown volume, partition or structure', () {
       final gadget = GadgetYaml.fromContent(fixture);
-      expect(
-          () => gadget.updatePartitionSize('nope', 'root', '1G'),
+      expect(() => gadget.updatePartitionSize('nope', 'root', '1G'),
           throwsA(isA<GadgetYamlException>()));
-      expect(
-          () => gadget.updatePartitionSize('pc', 'nope', '1G'),
+      expect(() => gadget.updatePartitionSize('pc', 'nope', '1G'),
           throwsA(isA<GadgetYamlException>()));
 
-      final noStructure = GadgetYaml.fromContent('volumes:\n  pc:\n    foo: 1\n');
-      expect(
-          () => noStructure.updatePartitionSize('pc', 'root', '1G'),
+      final noStructure =
+          GadgetYaml.fromContent('volumes:\n  pc:\n    foo: 1\n');
+      expect(() => noStructure.updatePartitionSize('pc', 'root', '1G'),
           throwsA(isA<GadgetYamlException>()));
     });
   });
@@ -459,7 +478,8 @@ connections:
     test('rename succeeds even when the key line carries a comment', () {
       // Note: yaml_edit does not carry the old key's inline comment over to
       // the new key; the rename itself must still work.
-      final gadget = GadgetYaml.fromContent('volumes:\n  pc: # default disk\n    foo: 1\n');
+      final gadget = GadgetYaml.fromContent(
+          'volumes:\n  pc: # default disk\n    foo: 1\n');
       gadget.renameVolume('pc', 'pc2');
       expect(gadget.has(const ['volumes', 'pc2', 'foo']), isTrue);
       expect(gadget.valueAt(const ['volumes', 'pc2', 'foo']), 1);
@@ -473,8 +493,8 @@ connections:
     });
 
     test('throws when the target name is taken', () {
-      final gadget = GadgetYaml.fromContent(
-          'volumes:\n  a:\n    x: 1\n  b:\n    y: 2\n');
+      final gadget =
+          GadgetYaml.fromContent('volumes:\n  a:\n    x: 1\n  b:\n    y: 2\n');
       expect(() => gadget.renameVolume('a', 'b'),
           throwsA(isA<GadgetYamlException>()));
     });
@@ -503,8 +523,8 @@ connections:
       final gadget = GadgetYaml.fromContent('name: pc\n');
       gadget.update(const ['defaults', 'core22', 'hold'], true);
       expect(gadget.valueAt(const ['defaults', 'core22', 'hold']), true);
-      expect(gadget.toYaml(),
-          'name: pc\ndefaults:\n  core22:\n    hold: true\n');
+      expect(
+          gadget.toYaml(), 'name: pc\ndefaults:\n  core22:\n    hold: true\n');
     });
 
     test('update appends a missing top-level key at the end', () {
@@ -514,7 +534,8 @@ connections:
       expect(gadget.toYaml(), 'name: pc\nconnections: []\n');
     });
 
-    test('update replaces a null-valued key in place without duplicating it', () {
+    test('update replaces a null-valued key in place without duplicating it',
+        () {
       final gadget = GadgetYaml.fromContent('a: 1\ndefaults:\nb: 2\n');
       gadget.update(const ['defaults'], {'x': 'y'});
       expect(gadget.toYaml(), 'a: 1\ndefaults:\n  x: y\nb: 2\n');
@@ -528,17 +549,18 @@ connections:
     });
 
     test('insertIntoList splices at a position', () {
-      final gadget = GadgetYaml.fromContent('kernel-cmdline:\n  allow:\n    - a\n    - b\n');
+      final gadget = GadgetYaml.fromContent(
+          'kernel-cmdline:\n  allow:\n    - a\n    - b\n');
       gadget.insertIntoList(const ['kernel-cmdline', 'allow'], 1, 'z');
       expect(
           gadget.valueAt(const ['kernel-cmdline', 'allow']), ['a', 'z', 'b']);
     });
 
     test('appendToList appends', () {
-      final gadget = GadgetYaml.fromContent('kernel-cmdline:\n  allow:\n    - a\n');
+      final gadget =
+          GadgetYaml.fromContent('kernel-cmdline:\n  allow:\n    - a\n');
       gadget.appendToList(const ['kernel-cmdline', 'allow'], 'b');
-      expect(
-          gadget.valueAt(const ['kernel-cmdline', 'allow']), ['a', 'b']);
+      expect(gadget.valueAt(const ['kernel-cmdline', 'allow']), ['a', 'b']);
     });
 
     test('appendToList requires the list to exist', () {
@@ -595,9 +617,11 @@ connections:
       gadget.removeDefault('core20');
       gadget.save(); // must be a no-op
       expect(gadget.isFileBacked, isFalse);
-      expect(gadget.toYaml(),
-          fixture.replaceFirst('name: pc\n', 'name: pc-x\n').replaceAll(
-              '  core20:\n    refresh-motivation: timely\n', ''));
+      expect(
+          gadget.toYaml(),
+          fixture
+              .replaceFirst('name: pc\n', 'name: pc-x\n')
+              .replaceAll('  core20:\n    refresh-motivation: timely\n', ''));
     });
 
     test('file-backed save persists to disk and re-reads the file', () {
@@ -724,6 +748,316 @@ hooks:
       expect(g.getApiKey(), 'disk-value');
       // A fresh read from disk sees the value too.
       expect(GadgetYaml.fromFile(file.path).getApiKey(), 'disk-value');
+    });
+  });
+
+  // A realistic meta/snap.yaml fixture in the shape of an arm-based gadget
+  // (e.g. pi-gadget): a comment-annotated slots list mixing
+  // interface-specific attributes (number / path / chip-number+channel).
+  const snapFixture = '''
+name: pi
+version: 24-3
+summary: Raspberry Pi gadget
+type: gadget
+slots:
+  # GPIO 519 and 520 are by default in use for the SPI0 device
+  bcm-gpio-512:
+    interface: gpio
+    number: 512
+  i2c-0:
+    interface: i2c
+    path: /dev/i2c-0
+  bt-serial:
+    interface: serial-port
+    path: /dev/ttyAMA0
+  pwm0:
+    interface: pwm
+    chip-number: 0
+    channel: 0
+''';
+
+  group('getSlots', () {
+    test('returns slot name to attribute maps, preserving order', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      final slots = gadget.getSlots();
+      expect(
+        slots.keys.toList(),
+        ['bcm-gpio-512', 'i2c-0', 'bt-serial', 'pwm0'],
+      );
+      expect(slots['i2c-0'], {'interface': 'i2c', 'path': '/dev/i2c-0'});
+      expect(
+          slots['pwm0'], {'interface': 'pwm', 'chip-number': 0, 'channel': 0});
+    });
+
+    test('returns an empty map when no slots section exists', () {
+      expect(GadgetYaml.fromContent('name: pc\ntype: gadget\n').getSlots(),
+          isEmpty);
+    });
+
+    test('returns an empty map when slots is null', () {
+      expect(GadgetYaml.fromContent('name: pi\nslots:\n').getSlots(), isEmpty);
+    });
+
+    test('file-backed getSlots reads the file', () {
+      final file = writeTemp('snap.yaml', snapFixture);
+      final gadget = GadgetYaml.fromFile(file.path);
+      expect(gadget.getSlots().length, 4);
+    });
+  });
+
+  group('addSlot', () {
+    test('appends a new slot at the end of the slots map', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      gadget.addSlot('i2c-1', {'interface': 'i2c', 'path': '/dev/i2c-1'});
+      final yaml = gadget.toYaml();
+      expect(gadget.getSlots().keys.toList(),
+          ['bcm-gpio-512', 'i2c-0', 'bt-serial', 'pwm0', 'i2c-1']);
+      // Block style, correct nesting, appended after the last slot.
+      expect(yaml,
+          contains('  i2c-1:\n    interface: i2c\n    path: /dev/i2c-1\n'));
+      expect(yaml.indexOf('i2c-1:'), greaterThan(yaml.indexOf('channel: 0')));
+    });
+
+    test('creates the slots section at the end of the document', () {
+      final gadget =
+          GadgetYaml.fromContent('name: pi\ntype: gadget\nbase: core24\n');
+      gadget.addSlot('spi0', {'interface': 'spi', 'path': '/dev/spidev0.0'});
+      final yaml = gadget.toYaml();
+      expect(
+          yaml,
+          'name: pi\ntype: gadget\nbase: core24\n'
+          'slots:\n'
+          '  spi0:\n'
+          '    interface: spi\n'
+          '    path: /dev/spidev0.0\n');
+    });
+
+    test('preserves unrelated sections and their order', () {
+      final gadget = GadgetYaml.fromContent('name: pi\ntype: gadget\n');
+      gadget.addSlot('s0', {'interface': 'serial-port', 'path': '/dev/ttyS0'});
+      final yaml = gadget.toYaml();
+      expect(yaml.indexOf('name: pi'), 0);
+      expect(yaml.indexOf('type: gadget'), greaterThan(0));
+      expect(yaml.indexOf('slots:'), greaterThan(yaml.indexOf('type: gadget')));
+    });
+
+    test('rejects a duplicate slot name', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+        () => gadget.addSlot('i2c-0', {'interface': 'i2c', 'path': 'x'}),
+        throwsA(isA<GadgetYamlException>()),
+      );
+    });
+
+    test('rejects an empty slot name', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(() => gadget.addSlot('', {'interface': 'i2c'}),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('rejects an invalid slot name', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+        () => gadget.addSlot('/dev/i2c-0', {'interface': 'i2c'}),
+        throwsA(isA<GadgetYamlException>()),
+      );
+    });
+
+    test('requires a non-empty string interface', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(() => gadget.addSlot('s1', {'path': '/dev/i2c-1'}),
+          throwsA(isA<GadgetYamlException>()));
+      expect(() => gadget.addSlot('s1', {'interface': ''}),
+          throwsA(isA<GadgetYamlException>()));
+      expect(() => gadget.addSlot('s1', {'interface': 3}),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('rejects non-scalar attribute values', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+        () => gadget.addSlot('s1', {
+          'interface': 'i2c',
+          'path': ['/dev/i2c-1']
+        }),
+        throwsA(isA<GadgetYamlException>()),
+      );
+      expect(
+        () => gadget.addSlot('s1', {
+          'interface': 'i2c',
+          'x': {'y': 1}
+        }),
+        throwsA(isA<GadgetYamlException>()),
+      );
+    });
+
+    test('rejects an invalid attribute name', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+        () => gadget.addSlot('s1', {'interface': 'i2c', '/weird': 1}),
+        throwsA(isA<GadgetYamlException>()),
+      );
+    });
+
+    test('file-backed addSlot persists to disk on save', () {
+      final file = writeTemp('snap.yaml', 'name: pi\ntype: gadget\n');
+      final gadget = GadgetYaml.fromFile(file.path);
+      gadget.addSlot('i2c-1', {'interface': 'i2c', 'path': '/dev/i2c-1'});
+      gadget.save();
+      expect(
+          GadgetYaml.fromFile(file.path).getSlots().keys.toList(), ['i2c-1']);
+    });
+  });
+
+  group('setSlot', () {
+    test('replaces the attributes in place, keeping the slot position', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      gadget
+          .setSlot('i2c-0', {'interface': 'serial-port', 'path': '/dev/ttyS0'});
+      final slots = gadget.getSlots();
+      expect(
+          slots.keys.toList(), ['bcm-gpio-512', 'i2c-0', 'bt-serial', 'pwm0']);
+      expect(
+          slots['i2c-0'], {'interface': 'serial-port', 'path': '/dev/ttyS0'});
+    });
+
+    test('drops attributes that are not passed again', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      gadget.setSlot('pwm0', {'interface': 'pwm', 'chip-number': 1});
+      expect(gadget.getSlots()['pwm0'], {'interface': 'pwm', 'chip-number': 1});
+    });
+
+    test('can add new attributes to an existing slot', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      gadget.setSlot(
+          'i2c-0', {'interface': 'i2c', 'path': '/dev/i2c-0', 'extra': true});
+      expect(gadget.getSlots()['i2c-0'],
+          {'interface': 'i2c', 'path': '/dev/i2c-0', 'extra': true});
+    });
+
+    test('throws for a missing slot', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+        () => gadget.setSlot('nope', {'interface': 'i2c'}),
+        throwsA(isA<GadgetYamlException>()),
+      );
+    });
+
+    test('validates attributes like addSlot', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+        () => gadget.setSlot('i2c-0', {'path': '/dev/i2c-0'}),
+        throwsA(isA<GadgetYamlException>()),
+      );
+      expect(() => gadget.setSlot('i2c-0', {'interface': 5}),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('file-backed setSlot persists to disk on save', () {
+      final file = writeTemp('snap.yaml', snapFixture);
+      final gadget = GadgetYaml.fromFile(file.path);
+      gadget
+          .setSlot('i2c-0', {'interface': 'serial-port', 'path': '/dev/ttyS0'});
+      gadget.save();
+      expect(GadgetYaml.fromFile(file.path).getSlots()['i2c-0'],
+          {'interface': 'serial-port', 'path': '/dev/ttyS0'});
+    });
+  });
+
+  group('removeSlot', () {
+    test('removes the named slot, keeping the rest intact', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      gadget.removeSlot('i2c-0');
+      final slots = gadget.getSlots();
+      expect(slots.keys.toList(), ['bcm-gpio-512', 'bt-serial', 'pwm0']);
+      expect(slots['bt-serial'],
+          {'interface': 'serial-port', 'path': '/dev/ttyAMA0'});
+    });
+
+    test('prunes the slots section when the last slot is removed', () {
+      final gadget = GadgetYaml.fromContent(
+          'name: pi\nslots:\n  s0:\n    interface: i2c\n');
+      gadget.removeSlot('s0');
+      final yaml = gadget.toYaml();
+      expect(yaml, 'name: pi\n');
+      expect(yaml, isNot(contains('slots')));
+      expect(gadget.getSlots(), isEmpty);
+    });
+
+    test('throws when no slots section exists', () {
+      final gadget = GadgetYaml.fromContent('name: pc\n');
+      expect(
+          () => gadget.removeSlot('s0'), throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('throws for a missing slot name', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+          () => gadget.removeSlot('nope'), throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('file-backed removeSlot persists to disk on save', () {
+      final file = writeTemp('snap.yaml', snapFixture);
+      final gadget = GadgetYaml.fromFile(file.path);
+      gadget.removeSlot('bcm-gpio-512');
+      gadget.save();
+      expect(GadgetYaml.fromFile(file.path).getSlots().keys.toList(),
+          ['i2c-0', 'bt-serial', 'pwm0']);
+    });
+  });
+
+  group('renameSlot', () {
+    test('renames while keeping the attributes', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      gadget.renameSlot('bt-serial', 'bt-serial-renamed');
+      final slots = gadget.getSlots();
+      expect(slots.keys.toList(),
+          ['bcm-gpio-512', 'i2c-0', 'pwm0', 'bt-serial-renamed']);
+      expect(slots['bt-serial-renamed'],
+          {'interface': 'serial-port', 'path': '/dev/ttyAMA0'});
+    });
+
+    test('moves the renamed slot to the end of the slots map', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      gadget.renameSlot('bcm-gpio-512', 'gpio-a');
+      final yaml = gadget.toYaml();
+      expect(yaml.indexOf('gpio-a:'), greaterThan(yaml.indexOf('channel: 0')));
+    });
+
+    test('is a no-op when old and new name are equal', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      final before = gadget.toYaml();
+      gadget.renameSlot('i2c-0', 'i2c-0');
+      expect(gadget.toYaml(), before);
+    });
+
+    test('throws for a missing old name', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(() => gadget.renameSlot('nope', 'new'),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('throws when the new name already exists', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(
+        () => gadget.renameSlot('i2c-0', 'bt-serial'),
+        throwsA(isA<GadgetYamlException>()),
+      );
+    });
+
+    test('rejects an invalid new name', () {
+      final gadget = GadgetYaml.fromContent(snapFixture);
+      expect(() => gadget.renameSlot('i2c-0', '/bad'),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('file-backed renameSlot persists to disk on save', () {
+      final file = writeTemp('snap.yaml', snapFixture);
+      final gadget = GadgetYaml.fromFile(file.path);
+      gadget.renameSlot('i2c-0', 'i2c-renamed');
+      gadget.save();
+      expect(GadgetYaml.fromFile(file.path).getSlots().keys.toList(),
+          ['bcm-gpio-512', 'bt-serial', 'pwm0', 'i2c-renamed']);
     });
   });
 }
