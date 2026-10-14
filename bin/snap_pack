@@ -230,6 +230,36 @@ def determine_compression(snap_dir):
     # Default to xz compression (standard for snaps)
     return "xz"
 
+def architecture_token(snap_yaml_path):
+    """Map the snap's declared architectures to the filename token.
+
+    Mirrors snapcraft's output naming ``<name>_<version>_<target>.snap``
+    (``snapcraft/pack.py::_get_filename``), where ``target`` is the
+    craft-platforms platform name of the declared ``architectures``:
+    a single architecture is that architecture, ``architectures: all``
+    is ``all``, and several architectures in one snap is ``multi-arch``.
+    """
+    try:
+        with open(snap_yaml_path, 'r') as f:
+            yaml_data = yaml.safe_load(f)
+    except Exception:
+        yaml_data = None
+    if not isinstance(yaml_data, dict):
+        return 'all'
+    raw = yaml_data.get('architectures')
+    if isinstance(raw, list):
+        arches = [str(a) for a in raw if str(a).strip()]
+    elif raw is not None:
+        arches = [str(raw)]
+    else:
+        arches = []
+    if not arches:
+        return 'all'
+    if len(arches) == 1:
+        return 'all' if arches[0] == 'all' else arches[0]
+    return 'multi-arch'
+
+
 def extract_name_and_version(snap_yaml_path):
     """Extract name and version from snap.yaml file."""
     try:
@@ -312,9 +342,15 @@ def create_snap_package(snap_dir, target_dir=None):
     name, version = extract_name_and_version(snap_yaml_path)
     print(f"Package name: {name}")
     print(f"Package version: {version}")
-    
+
+    # Architecture token for the filename (snapcraft convention:
+    # <name>_<version>_<arch>.snap, e.g. pc_26_amd64.snap or
+    # pc_26_multi-arch.snap).
+    arch_token = architecture_token(snap_yaml_path)
+    print(f"Architecture: {arch_token}")
+
     # Determine output filename
-    output_file = f"{name}_{version}.snap"
+    output_file = f"{name}_{version}_{arch_token}.snap"
     
     # Determine output directory
     if target_dir:
@@ -415,7 +451,9 @@ def main():
         print("Example: snap_pack ./my-snap ./output-dir")
         print("\nRepacks existing snap directory structures into valid .snap files")
         print("Snap file will be created in target directory or current directory")
-        print("Following standard snap naming convention: $name_$version.snap")
+        print("Following standard snap naming convention: "
+              "$name_$version_$architecture.snap (architecture from "
+              "meta/snap.yaml: single arch, 'all', or 'multi-arch')")
         return
     
     snap_dir = sys.argv[1]

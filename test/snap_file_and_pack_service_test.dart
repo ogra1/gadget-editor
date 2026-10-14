@@ -40,6 +40,31 @@ Future<String> _makeUnpackedSnap(Directory parent) async {
   return snapDir.path;
 }
 
+/// Builds an unpacked snap directory whose `meta/snap.yaml` declares
+/// [architectures] (flow-style list). Used to exercise the real
+/// `bin/snap_pack` naming.
+Future<String> _makeUnpackedSnapWithArchs(Directory parent,
+    List<String> architectures) async {
+  final snapDir =
+      await Directory('${parent.path}/unpacked-archs').create();
+  await Directory('${snapDir.path}/meta').create();
+  await File('${snapDir.path}/meta/gadget.yaml')
+      .writeAsString(_gadgetYaml);
+  final archList = architectures.isEmpty
+      ? ''
+      : 'architectures: [${architectures.join(', ')}]\n';
+  await File('${snapDir.path}/meta/snap.yaml').writeAsString('''
+name: pc
+version: "26.04"
+type: gadget
+confinement: strict
+grade: stable
+summary: Test gadget
+description: A test gadget snap for the pack naming tests.
+$archList''');
+  return snapDir.path;
+}
+
 /// Builds a real .snap (squashfs) containing [gadgetYaml]/[snapYaml],
 /// returning the file path. Requires squashfs-tools on the host.
 Future<String> _makeRealSnap(Directory parent) async {
@@ -245,6 +270,71 @@ void main() {
       // while the name is still surfaced.
       expect(extracted.architectures, isEmpty);
       expect(extracted.snapNameFromYaml, 'pc');
+    });
+  });
+
+  group('bin/snap_pack naming (real tool)', () {
+    final realTool = '${Directory.current.path}/bin/snap_pack';
+
+    bool toolReady() {
+      final python = Process.runSync('python3', ['--version']);
+      if (python.exitCode != 0) {
+        return false;
+      }
+      final squashfs = Process.runSync('which', ['mksquashfs']);
+      final tool = File(realTool);
+      return squashfs.exitCode == 0 &&
+          tool.existsSync() &&
+          (tool.statSync().mode & 0x49) != 0; // any execute bit set
+    }
+
+    test('single architecture: <name>_<version>_<arch>.snap', () async {
+      if (!toolReady()) {
+        markTestSkipped('python3, mksquashfs, or bin/snap_pack missing');
+        return;
+      }
+      final snapDir =
+          await _makeUnpackedSnapWithArchs(tmp, ['amd64']);
+      final target = await Directory('${tmp.path}/out-amd64').create();
+      final service = SnapPackService(snapPackPath: realTool);
+      final result = service.packSnap(
+          '$snapDir/meta/gadget.yaml', target.path);
+      final packed = await result;
+      expect(packed.snapFileName, 'pc_26.04_amd64.snap');
+      expect(await File('${target.path}/pc_26.04_amd64.snap').exists(),
+          isTrue);
+    });
+
+    test('several architectures: <name>_<version>_multi-arch.snap',
+        () async {
+      if (!toolReady()) {
+        markTestSkipped('python3, mksquashfs, or bin/snap_pack missing');
+        return;
+      }
+      final snapDir = await _makeUnpackedSnapWithArchs(tmp,
+          ['amd64', 'arm64']);
+      final target = await Directory('${tmp.path}/out-multi').create();
+      final service = SnapPackService(snapPackPath: realTool);
+      final packed = await service.packSnap(
+          '$snapDir/meta/gadget.yaml', target.path);
+      expect(packed.snapFileName, 'pc_26.04_multi-arch.snap');
+      expect(await File('${target.path}/pc_26.04_multi-arch.snap').exists(),
+          isTrue);
+    });
+
+    test("'all' architectures: <name>_<version>_all.snap", () async {
+      if (!toolReady()) {
+        markTestSkipped('python3, mksquashfs, or bin/snap_pack missing');
+        return;
+      }
+      final snapDir = await _makeUnpackedSnapWithArchs(tmp, ['all']);
+      final target = await Directory('${tmp.path}/out-all').create();
+      final service = SnapPackService(snapPackPath: realTool);
+      final packed = await service.packSnap(
+          '$snapDir/meta/gadget.yaml', target.path);
+      expect(packed.snapFileName, 'pc_26.04_all.snap');
+      expect(await File('${target.path}/pc_26.04_all.snap').exists(),
+          isTrue);
     });
   });
 
