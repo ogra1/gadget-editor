@@ -11,6 +11,7 @@ description: |
     - manage kernel command-line parameters
     - change the image file name in the volume definition
     - Add an API Key for a dedicated store
+    - manage interface slots the gadget provides
     - and indeed change the name and version of the snap itself
 
   You can search and download existing gadget snaps from the global store with
