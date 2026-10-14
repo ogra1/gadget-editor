@@ -171,6 +171,117 @@ volumes:
     });
   });
 
+  group('removeDefaultEntry', () {
+    test('removes one setting, keeps the siblings', () {
+      final gadget = GadgetYaml.fromContent(
+          'name: pc\ndefaults:\n  core20:\n    a: 1\n    b: 2\n');
+      gadget.removeDefaultEntry('core20', 'a');
+      expect(gadget.toYaml(), 'name: pc\ndefaults:\n  core20:\n    b: 2\n');
+    });
+
+    test('removes one setting and keeps nearby comments', () {
+      final gadget = GadgetYaml.fromContent('''
+defaults:
+  core22:
+    # keep this one
+    hold: true
+    drop: false
+''');
+      gadget.removeDefaultEntry('core22', 'drop');
+      expect(
+        gadget.toYaml(),
+        '''
+defaults:
+  core22:
+    # keep this one
+    hold: true
+''',
+      );
+    });
+
+    test('prunes the snap ID when its last setting goes', () {
+      final gadget = GadgetYaml.fromContent(
+          'name: pc\ndefaults:\n  core20:\n    a: 1\n    b: 2\n');
+      gadget.removeDefaultEntry('core20', 'a');
+      gadget.removeDefaultEntry('core20', 'b');
+      expect(gadget.toYaml(), 'name: pc\n');
+    });
+
+    test('removes one item of a flat list of settings', () {
+      final gadget = GadgetYaml.fromContent(
+          'name: pc\ndefaults:\n  core20:\n    - a\n    - b\n');
+      gadget.removeDefaultEntry('core20', 0);
+      expect(gadget.toYaml(), 'name: pc\ndefaults:\n  core20:\n    - b\n');
+    });
+
+    test('prunes the snap ID and section when the last list item goes', () {
+      final gadget =
+          GadgetYaml.fromContent('name: pc\ndefaults:\n  core20:\n    - a\n');
+      gadget.removeDefaultEntry('core20', 0);
+      expect(gadget.toYaml(), 'name: pc\n');
+    });
+
+    test('throws when the defaults section is missing', () {
+      final gadget = GadgetYaml.fromContent('name: pc\n');
+      expect(() => gadget.removeDefaultEntry('core20', 'a'),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('throws when the snap ID is missing', () {
+      final gadget =
+          GadgetYaml.fromContent('name: pc\ndefaults:\n  core20:\n    a: 1\n');
+      expect(() => gadget.removeDefaultEntry('core22', 'a'),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('throws when the setting key is missing', () {
+      final gadget =
+          GadgetYaml.fromContent('name: pc\ndefaults:\n  core20:\n    a: 1\n');
+      expect(() => gadget.removeDefaultEntry('core20', 'b'),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('throws on a type mismatch (string key into a list)', () {
+      final gadget = GadgetYaml.fromContent(
+          'name: pc\ndefaults:\n  core20:\n    - a\n    - b\n');
+      expect(() => gadget.removeDefaultEntry('core20', 'a'),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('throws on an out-of-range list index', () {
+      final gadget =
+          GadgetYaml.fromContent('name: pc\ndefaults:\n  core20:\n    - a\n');
+      expect(() => gadget.removeDefaultEntry('core20', 5),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('throws when the snap ID value is a scalar', () {
+      final gadget =
+          GadgetYaml.fromContent('name: pc\ndefaults:\n  core20: flat\n');
+      expect(() => gadget.removeDefaultEntry('core20', 'a'),
+          throwsA(isA<GadgetYamlException>()));
+    });
+
+    test('a failed removal leaves the document untouched', () {
+      final gadget =
+          GadgetYaml.fromContent('name: pc\ndefaults:\n  core20:\n    a: 1\n');
+      expect(() => gadget.removeDefaultEntry('core20', 'nope'),
+          throwsA(isA<GadgetYamlException>()));
+      expect(gadget.toYaml(), 'name: pc\ndefaults:\n  core20:\n    a: 1\n');
+    });
+
+    test('file-backed removal persists to disk on save', () {
+      final file = writeTemp('gadget.yaml',
+          'name: pc\ndefaults:\n  core20:\n    a: 1\n    b: 2\n');
+      final gadget = GadgetYaml.fromFile(file.path);
+      gadget.removeDefaultEntry('core20', 'a');
+      gadget.save();
+      final reloaded = GadgetYaml.fromFile(file.path);
+      expect(reloaded.valueAt(const ['defaults', 'core20', 'a']), isNull);
+      expect(reloaded.valueAt(const ['defaults', 'core20', 'b']), 2);
+    });
+  });
+
   group('setDefault', () {
     test('creates the defaults section and dot-separated nesting on demand',
         () {

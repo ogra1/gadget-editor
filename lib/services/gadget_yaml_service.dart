@@ -543,6 +543,68 @@ class GadgetYaml {
     });
   }
 
+  /// Removes one setting from `defaults[snapId]`.
+  ///
+  /// [entry] identifies the setting *within* the snap ID's value: a
+  /// top-level map key (e.g. `hold` in `defaults.core20.hold`) when the
+  /// snap ID holds a map of settings, or an index when it holds a flat
+  /// list. It is deliberately *not* a dot-separated path, so deleting one
+  /// setting never reaches across the nesting. When the removal leaves the
+  /// snap ID empty, the whole snap-ID entry is pruned as well, and when no
+  /// snap IDs remain the `defaults` section goes with them.
+  ///
+  /// Throws [GadgetYamlException] if the section, snap ID or setting does
+  /// not exist, or if the snap ID's value is a scalar (which must be
+  /// deleted as a whole via [removeDefault]).
+  void removeDefaultEntry(String snapId, Object? entry) {
+    final defaults = nodeAt(const ['defaults']);
+    if (defaults is! YamlMap) {
+      throw GadgetYamlException("No 'defaults' section in gadget YAML");
+    }
+    if (!defaults.containsKey(snapId)) {
+      throw GadgetYamlException("No entry '$snapId' in the 'defaults' section");
+    }
+    final entryNode = nodeAt(['defaults', snapId]);
+    if (entryNode is YamlMap) {
+      // A map of settings: the entry is a top-level key (String).
+      if (entry is! String || !entryNode.containsKey(entry)) {
+        throw GadgetYamlException(
+            "No setting '$entry' under the '$snapId' defaults");
+      }
+      _guard(() {
+        _editor.remove(['defaults', snapId, entry]);
+        _pruneEmptiedDefaults(snapId);
+      });
+      return;
+    }
+    if (entryNode is YamlList) {
+      // A flat list of settings: the entry is an in-range index.
+      if (entry is! int || entry < 0 || entry >= entryNode.length) {
+        throw GadgetYamlException(
+            "No setting at index $entry under the '$snapId' defaults");
+      }
+      _guard(() {
+        _editor.remove(['defaults', snapId, entry]);
+        _pruneEmptiedDefaults(snapId);
+      });
+      return;
+    }
+    throw GadgetYamlException(
+        "The '$snapId' default is a scalar; delete it as a whole instead");
+  }
+
+  /// Removes the snap-ID entry — and, if it leaves `defaults` empty, the
+  /// section itself — after a single-setting removal emptied it.
+  void _pruneEmptiedDefaults(String snapId) {
+    if (_isEmptyMapAt(['defaults', snapId]) ||
+        _isEmptyListAt(['defaults', snapId])) {
+      _editor.remove(['defaults', snapId]);
+    }
+    if (_isEmptyMapAt(const ['defaults'])) {
+      _editor.remove(const ['defaults']);
+    }
+  }
+
   /// Sets the value at `defaults[snapId][key]`, creating any missing
   /// nesting on demand. [key] may be dot-separated (e.g. `foo.bar.baz`);
   /// an existing scalar on the path is replaced by the new nesting.

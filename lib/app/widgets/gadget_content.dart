@@ -172,8 +172,8 @@ class _GadgetContentState extends State<GadgetContent> {
                 _refreshContentFromFile();
               });
             },
-            onDelete: (data, index) {
-              _deleteDefault(data, index);
+            onDeleteEntry: (data, path) {
+              _deleteDefaultEntry(data, path);
             },
           ),
           const SizedBox(height: 16),
@@ -267,27 +267,24 @@ class _GadgetContentState extends State<GadgetContent> {
     );
   }
 
-  /// Removes the defaults entry at [index] (the key of the card that was
-  /// deleted, not necessarily index 0 in the map).
-  void _deleteDefault(dynamic data, Object? index) {
-    if (index is! int) {
+  /// Removes a single setting from a snap ID's defaults. [path] is
+  /// `[rootKey, entryKey]` (or deeper for list items: `[rootKey, index]`).
+  ///
+  /// Only top-level settings under a snap ID are deletable this way; the
+  /// card's own trash icon removes the whole snap-ID block.
+  void _deleteDefaultEntry(dynamic data, Object? pathArg) {
+    final path = pathArg is List ? pathArg : <Object?>[];
+    if (path.length < 2) {
       _status('Error deleting default: unknown position');
       return;
     }
-    final defaults = _yamlData['defaults'];
-    if (defaults is! Map) {
-      _status('Default deletion not implemented for this structure');
-      return;
-    }
-    final keys = defaults.keys.map((k) => k.toString()).toList();
-    if (index < 0 || index >= keys.length) {
-      _status('Error deleting default: no entry at index $index');
-      return;
-    }
-    final key = keys[index];
+    final snapId = path[0]?.toString() ?? '';
+    // List items pass their int index straight through; map keys are
+    // YamlNodes that stringify to their key text.
+    final entry = path[1] is int ? path[1] : path[1]?.toString() ?? '';
     _mutate(
-      (yaml) => yaml.removeDefault(key),
-      'Default deleted successfully',
+      (yaml) => yaml.removeDefaultEntry(snapId, entry),
+      'Default setting deleted successfully',
       'Error deleting default: ',
     );
   }

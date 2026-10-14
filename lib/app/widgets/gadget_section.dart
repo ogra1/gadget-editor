@@ -14,6 +14,11 @@ class GadgetSection extends StatelessWidget {
   /// Opens the per-card editor (Slots only for now).
   final Function(dynamic, Object?)? onEditEntry;
 
+  /// Per-setting delete (Defaults only). Invoked with
+  /// `(data, [rootKey, entryKey])` where [entryKey] is a map key or a list
+  /// index, so the callback always knows exactly which node to remove.
+  final Function(dynamic, Object?)? onDeleteEntry;
+
   final int? sectionIndex; // Add section index for tracking
 
   const GadgetSection({
@@ -24,6 +29,7 @@ class GadgetSection extends StatelessWidget {
     this.showEditButton = true,
     this.onDelete,
     this.onEditEntry,
+    this.onDeleteEntry,
     this.sectionIndex,
   });
 
@@ -574,7 +580,6 @@ class GadgetSection extends StatelessWidget {
         children: data.entries.toList().asMap().entries.map((entryWithIndex) {
           final key = entryWithIndex.value.key;
           final value = entryWithIndex.value.value;
-          final entryIndex = entryWithIndex.key;
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 4),
@@ -598,19 +603,10 @@ class GadgetSection extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         // Display the nested content - this is where the issue was
-                        _buildValueWidget(context, value),
+                        _buildValueWidget(context, value, deletePath: ['$key']),
                       ],
                     ),
                   ),
-                  if (onDelete != null)
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 16),
-                      onPressed: () {
-                        _showDeleteConfirmationDialog(
-                            context, 'Default', entryIndex);
-                      },
-                      tooltip: 'Delete default',
-                    ),
                 ],
               ),
             ),
@@ -623,7 +619,19 @@ class GadgetSection extends StatelessWidget {
     return _buildValueWidget(context, data);
   }
 
-  Widget _buildValueWidget(BuildContext context, dynamic value) {
+  /// The value tree of one Defaults snap-ID card.
+  ///
+  /// [deletePath] carries the path of the node being rendered, relative to
+  /// the `defaults` section, as `[rootKey, ...]` (a map key or a list
+  /// index per level). A trash icon is offered exactly where a whole
+  /// setting can be deleted: the top-level keys of a snap ID and the items
+  /// of its lists. Deeper nodes are nested *inside* a setting and are
+  /// managed through the section's edit dialog instead.
+  Widget _buildValueWidget(
+    BuildContext context,
+    dynamic value, {
+    List<Object?>? deletePath,
+  }) {
     if (value == null) {
       return const Text('null');
     }
@@ -659,25 +667,47 @@ class GadgetSection extends StatelessWidget {
       }
 
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: value.entries.map((entry) {
           final key = entry.key;
           final nestedValue = entry.value;
+          // A top-level key of a snap ID is one whole setting: deletable.
+          final canDelete = deletePath != null &&
+              deletePath.length == 1 &&
+              onDeleteEntry != null;
+          final rootKey = deletePath?.first.toString();
 
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '$key:',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$key:',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  if (canDelete)
+                    _deleteEntryButton(context,
+                        path: [...deletePath, key],
+                        label: '$key under $rootKey'),
+                ],
               ),
-              const SizedBox(height: 4),
               Container(
                 margin: const EdgeInsets.only(left: 16),
-                child: _buildValueWidget(context, nestedValue),
+                child: _buildValueWidget(
+                  context,
+                  nestedValue,
+                  // Nested keys live *inside* the setting; no delete.
+                  deletePath: deletePath == null ? null : [...deletePath, key],
+                ),
               ),
               const SizedBox(height: 8),
             ],
@@ -698,14 +728,28 @@ class GadgetSection extends StatelessWidget {
           children: value.asMap().entries.map((entry) {
             final index = entry.key;
             final item = entry.value;
+            // A list item under a snap ID is one setting: deletable.
+            final canDelete = deletePath != null &&
+                deletePath.length == 1 &&
+                onDeleteEntry != null;
+            final rootKey = deletePath?.first.toString();
 
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$index: '),
+                Text('$index: ', style: const TextStyle(fontSize: 12)),
                 Expanded(
-                  child: _buildValueWidget(context, item),
+                  child: _buildValueWidget(
+                    context,
+                    item,
+                    deletePath:
+                        deletePath == null ? null : [...deletePath, index],
+                  ),
                 ),
+                if (canDelete)
+                  _deleteEntryButton(context,
+                      path: [...deletePath, index],
+                      label: 'item $index under $rootKey'),
               ],
             );
           }).toList(),
@@ -714,7 +758,35 @@ class GadgetSection extends StatelessWidget {
     }
 
     // Handle primitive values
-    return Text('$value');
+    return Text('$value', style: const TextStyle(fontSize: 12));
+  }
+
+  /// Small trash icon removing one Defaults setting via [onDeleteEntry].
+  Widget _deleteEntryButton(BuildContext context,
+      {required List<Object?> path, required String label}) {
+    // A tight, top-aligned 24px tap target so the setting name and the
+    // trash icon sit on the same line without extra vertical space.
+    return Tooltip(
+      message: 'Delete setting',
+      child: InkWell(
+        onTap: () => _showDeleteConfirmationDialog(
+          context,
+          'Default',
+          null,
+          message: 'Are you sure you want to delete "$label"?',
+          onConfirm: () => onDeleteEntry!(data, path),
+        ),
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Icon(
+            Icons.delete,
+            size: 14,
+            color: Theme.of(context).hintColor,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSlotsContent(BuildContext context, dynamic data) {
@@ -816,13 +888,19 @@ class GadgetSection extends StatelessWidget {
   }
 
   void _showDeleteConfirmationDialog(
-      BuildContext context, String title, Object? index) {
+    BuildContext context,
+    String title,
+    Object? index, {
+    String? message,
+    VoidCallback? onConfirm,
+  }) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('Delete $title'),
-          content: Text('Are you sure you want to delete this $title?'),
+          content:
+              Text(message ?? 'Are you sure you want to delete this $title?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -833,8 +911,10 @@ class GadgetSection extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // Call the delete callback with the correct parameters
-                if (onDelete != null) {
+                if (onConfirm != null) {
+                  onConfirm();
+                } else if (onDelete != null) {
+                  // Default path: whole-entry delete via onDelete.
                   onDelete!(data, index);
                 }
               },
