@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 Full implementation of snap pack command for repacking snap directories
 into valid snap packages compatible with snap store upload.

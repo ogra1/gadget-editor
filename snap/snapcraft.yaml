@@ -72,19 +72,27 @@ parts:
       - xz-utils
       - zip
       - git
+      - python3-yaml
     stage-packages:
       - squashfs-tools
+      - python3-yaml
     override-build: |
       # Set up Flutter environment
+      rm -rf $CRAFT_PART_INSTALL/usr/libexec
       mkdir -p $CRAFT_PART_INSTALL/usr/libexec
       cd $CRAFT_PART_INSTALL/usr/libexec
-      git clone --depth 1 -b 3.47.5 https://github.com/flutter/flutter.git
+      git clone --depth 1 -b 3.47.7 https://github.com/flutter/flutter.git
       
       export PATH="$CRAFT_PART_INSTALL/usr/libexec/flutter/bin:$PATH"
       
-      # Build Flutter app for Linux
+      # Get flutter dependencies
       cd $CRAFT_PART_SRC
       flutter pub get
+
+      # run flutter tests
+      flutter test
+
+      # Build app
       flutter build linux --release
       
       # Copy the built application to bin
