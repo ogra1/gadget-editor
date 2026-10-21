@@ -149,7 +149,9 @@ class _GadgetContentState extends State<GadgetContent> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      // No bottom inset: the last section card should run up to the footer
+      // (the outer pane already dropped its bottom padding too).
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

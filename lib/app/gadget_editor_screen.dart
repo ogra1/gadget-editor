@@ -60,6 +60,9 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
   bool isDownloading = false;
   bool isActionButtonEnabled = false; // Button is inactive by default
   final TextEditingController _searchController = TextEditingController();
+  // Focus node for the sidebar search box so the empty-state "Search
+  // Snap Store" action can jump straight to typing.
+  final FocusNode _searchFocusNode = FocusNode();
   List<Map<String, dynamic>> availableChannels = [];
   Map<String, dynamic>? selectedChannel;
   String? tempDirectoryPath;
@@ -93,6 +96,10 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
   @override
   void initState() {
     super.initState();
+    // The search box is the app's primary entry point: focus it on
+    // startup so a snap name can be typed immediately.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _searchFocusNode.requestFocus());
+
     // Create a temporary directory for our snap files
     _createTempDirectory();
 
@@ -109,6 +116,7 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     // Clean up temporary files when the widget is disposed
     _cleanupTempFiles();
     super.dispose();
@@ -521,7 +529,25 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
       });
     }
   }
-  /// / Extracts a user-facing message from a service failure. The service
+  // Opens the file picker and loads the chosen gadget snap. Shared by the
+  // sidebar loader button and the empty-state "Load Local Snap" action.
+  Future<void> onLocalSnapPicked() async {
+    try {
+      // Use file_selector for cross-platform file picking
+      final file = await openFile();
+      if (file != null) {
+        loadLocalGadgetSnap(file.path);
+      }
+    } catch (e) {
+      setState(() {
+        error = 'Failed to select file: $e';
+        statusMessage = 'Error: Failed to select file';
+        isActionButtonEnabled = false; // Disable button on error
+      });
+    }
+  }
+
+  /// Extracts a user-facing message from a service failure. The service
   /// exceptions all carry one; anything else is stringified.
   String _serviceErrorMessage(Object e) {
     switch (e) {
@@ -539,13 +565,6 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gadget Editor'),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor ?? Theme.of(context).primaryColor,
-        foregroundColor: Theme.of(context).appBarTheme.foregroundColor ?? Colors.white,
-        elevation: 0,
-        toolbarHeight: 40,
-      ),
       body: Column(
         children: [
           // Main content area: fixed sidebar + editor pane.
@@ -554,27 +573,14 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
               children: [
                 GadgetEditorSidebar(
                   searchController: _searchController,
+                  searchFocusNode: _searchFocusNode,
                   onSearchSubmitted: (value) {
                     if (value.isNotEmpty) {
                       // Only set snapName from the actual snap.yaml content when downloading
                       fetchSnapChannels(value);
                     }
                   },
-                  onLocalSnapPicked: () async {
-                    try {
-                      // Use file_selector for cross-platform file picking
-                      final file = await openFile();
-                      if (file != null) {
-                        loadLocalGadgetSnap(file.path);
-                      }
-                    } catch (e) {
-                      setState(() {
-                        error = 'Failed to select file: $e';
-                        statusMessage = 'Error: Failed to select file';
-                        isActionButtonEnabled = false; // Disable button on error
-                      });
-                    }
-                  },
+                  onLocalSnapPicked: onLocalSnapPicked,
                   availableChannels: availableChannels,
                   selectedChannel: selectedChannel,
                   isDownloading: isDownloading,
@@ -606,26 +612,25 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
   }
 
   /// The right-hand editor pane: the snap header row (name, version,
-  /// architecture) followed by the gadget content, or a placeholder when
-  /// nothing is loaded.
+  /// architecture) followed by the gadget content, or a centered
+  /// [EmptyState] placeholder when nothing is loaded.
+  ///
+  /// The pane has no padding of its own: the loaded layout carries its own
+  /// 16px padding (unchanged), and the empty-state card is self-contained
+  /// (its internal margins center it in whatever space it is given, even
+  /// when that space is shorter than the card's natural height).
   Widget _buildMainContent(BuildContext context) {
-    return Container(
-      color: Theme.of(context).colorScheme.surface,
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (gadgetData != null)
-            _buildHeaderRow(context)
-          else
-            const Text(
-              'Gadget Editor',
-              style: TextStyle(
-                fontSize: 24,
-              ),
-            ),
-          const SizedBox(height: 16),
-          if (gadgetData != null)
+    if (gadgetData != null) {
+      return Container(
+        color: Theme.of(context).colorScheme.surface,
+        // No bottom inset: the editor content should reach the footer
+        // (previously the outer 16 + the scroll's 16 left a 32px dead band).
+        padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeaderRow(context),
+            const SizedBox(height: 16),
             Expanded(
               child: GadgetContent(
                 content: gadgetContent,
@@ -643,14 +648,12 @@ class GadgetEditorScreenState extends State<GadgetEditorScreen> {
                   });
                 },
               ),
-            )
-          else
-            const Expanded(
-              child: EmptyState(),
             ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
+    return const EmptyState();
   }
 
   /// The editable snap header row: name, version, and architecture badge.

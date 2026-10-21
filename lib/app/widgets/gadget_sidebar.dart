@@ -16,8 +16,15 @@ import 'sidebar_header.dart';
 /// models selectable master tiles with a per-tile detail, which doesn't fit
 /// a search box + loader + conditional info list). It takes its data and
 /// callbacks from the screen and owns no state.
+///
+/// Layout note: the [SidebarHeader] sits *outside* the 16px content padding
+/// so its separator line can run edge to edge; the search box, loader, and
+/// info lists keep the usual 16px inset via the inner padding.
 class GadgetEditorSidebar extends StatelessWidget {
   final TextEditingController searchController;
+  // Optional focus node so the screen can jump to the search box (e.g. from
+  // the empty-state "Search Snap Store" action).
+  final FocusNode? searchFocusNode;
   final ValueChanged<String> onSearchSubmitted;
   final FutureOr<void> Function() onLocalSnapPicked;
 
@@ -36,6 +43,7 @@ class GadgetEditorSidebar extends StatelessWidget {
   const GadgetEditorSidebar({
     super.key,
     required this.searchController,
+    this.searchFocusNode,
     required this.onSearchSubmitted,
     required this.onLocalSnapPicked,
     required this.availableChannels,
@@ -54,7 +62,6 @@ class GadgetEditorSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 300,
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         border: Border(
           right: BorderSide(
@@ -64,25 +71,37 @@ class GadgetEditorSidebar extends StatelessWidget {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Full-bleed brand header (its separator spans the whole width).
           const SidebarHeader(),
-          const SizedBox(height: 16),
-          SearchSection(
-            controller: searchController,
-            onSubmitted: onSearchSubmitted,
-          ),
-          const SizedBox(height: 16),
-          LocalSnapLoader(onPressed: onLocalSnapPicked),
-          const SizedBox(height: 16),
-          if (availableChannels.isNotEmpty)
-            _buildAvailableChannels(context)
-          else if (isLocalMode && hasGadgetData)
-            _buildLocalSnap(context)
-          else
-            const Expanded(
-              child: SizedBox.shrink(), // Sidebar shows nothing but search + loader
+          Expanded(
+            child: Padding(
+              // No bottom inset: the channel list / local-snap card should
+              // run right up to the footer (the sidebar's right border already
+              // reaches it; the content did not).
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SearchSection(
+                    controller: searchController,
+                    focusNode: searchFocusNode,
+                    onSubmitted: onSearchSubmitted,
+                  ),
+                  const SizedBox(height: 16),
+                  LocalSnapLoader(onPressed: onLocalSnapPicked),
+                  const SizedBox(height: 16),
+                  if (availableChannels.isNotEmpty)
+                    _buildAvailableChannels(context)
+                  else if (isLocalMode && hasGadgetData)
+                    _buildLocalSnap(context)
+                  else
+                    const SizedBox.shrink(), // Nothing but search + loader.
+                ],
+              ),
             ),
+          ),
         ],
       ),
     );

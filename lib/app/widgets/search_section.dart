@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 class SearchSection extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final Function(String) onSubmitted;
 
   const SearchSection({
     super.key,
     required this.controller,
+    this.focusNode,
     required this.onSubmitted,
   });
 
@@ -14,6 +16,7 @@ class SearchSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       decoration: InputDecoration(
         labelText: 'Search Snap Store...',
         border: OutlineInputBorder(
