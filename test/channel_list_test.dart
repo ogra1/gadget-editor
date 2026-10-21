@@ -113,8 +113,14 @@ void main() {
       expect(find.text('24/stable'), findsOneWidget);
       // ... with a progress indicator on top ...
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      // ... and no longer interactive.
-      await tester.tap(find.byIcon(Icons.download_for_offline).first);
+      // ... and no longer interactive. The list is wrapped in an
+      // IgnorePointer (see ChannelList), so this tap is *expected* to miss
+      // its hit test — warnIfMissed: false suppresses the (misleading)
+      // "would not hit test" warning; the assertion below is the real check.
+      await tester.tap(
+        find.byIcon(Icons.download_for_offline).first,
+        warnIfMissed: false,
+      );
       await tester.pump();
       expect(tapped, isFalse);
     });
