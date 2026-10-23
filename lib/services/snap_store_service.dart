@@ -74,7 +74,7 @@ class SnapStoreService {
         );
     if (response.statusCode != 200) {
       throw StoreException(
-          'Snap not found: $snapName (${utf8.decode(response.bytes)})');
+          'Snap not found: $snapName (${_describeResponseBody(response.bytes)})');
     }
 
     final data = jsonDecode(utf8.decode(response.bytes));
@@ -167,5 +167,36 @@ class SnapStoreService {
     final outFile = File('$targetDirectory/$fileName');
     await outFile.writeAsBytes(response.bytes);
     return outFile;
+  }
+
+  /// Extracts a human-readable message from a store error response.
+  ///
+  /// The snap store reports errors as JSON with an `error-list`, e.g.
+  /// `{"error-list":[{"code":"resource-not-found",
+  /// "message":"No snap named 'x' found in series '16'."}]}`. When
+  /// that structure is present the messages are returned (joined with
+  /// `'; '` if several); otherwise the raw body text is used so nothing
+  /// is ever lost.
+  static String _describeResponseBody(List<int> bytes) {
+    final body = utf8.decode(bytes, allowMalformed: true);
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        final errorList = decoded['error-list'];
+        if (errorList is List) {
+          final messages = errorList
+              .whereType<Map<String, dynamic>>()
+              .map((entry) => entry['message'])
+              .whereType<String>()
+              .toList();
+          if (messages.isNotEmpty) {
+            return messages.join('; ');
+          }
+        }
+      }
+    } on FormatException {
+      // Not JSON; fall through and show the raw body.
+    }
+    return body;
   }
 }

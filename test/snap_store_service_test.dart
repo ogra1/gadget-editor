@@ -151,6 +151,68 @@ void main() {
       );
     });
 
+    test('shows the error-list message on non-200', () async {
+      final http = FakeStoreHttp({
+        'https://api.snapcraft.io/v2/snaps/info/foobar': (
+          404,
+          utf8.encode(jsonEncode({
+            'error-list': [
+              {
+                'code': 'resource-not-found',
+                'message': "No snap named 'foobar' found in series '16'.",
+              },
+            ],
+          })),
+        ),
+      });
+      final service = SnapStoreService(httpClient: http);
+
+      expect(
+        () => service.searchGadgetChannels('foobar'),
+        throwsA(isA<StoreException>().having(
+            (e) => e.message,
+            'message',
+            contains("No snap named 'foobar' found in series '16'."))),
+      );
+    });
+
+    test('joins multiple error-list messages on non-200', () async {
+      final http = FakeStoreHttp({
+        'https://api.snapcraft.io/v2/snaps/info/foobar': (
+          400,
+          utf8.encode(jsonEncode({
+            'error-list': [
+              {'code': 'invalid', 'message': 'first problem'},
+              {'code': 'invalid', 'message': 'second problem'},
+            ],
+          })),
+        ),
+      });
+      final service = SnapStoreService(httpClient: http);
+
+      expect(
+        () => service.searchGadgetChannels('foobar'),
+        throwsA(isA<StoreException>().having(
+            (e) => e.message,
+            'message',
+            contains('first problem; second problem'))),
+      );
+    });
+
+    test('shows raw body for non-JSON non-200 responses', () async {
+      final http = FakeStoreHttp({
+        'https://api.snapcraft.io/v2/snaps/info/foobar':
+            (503, utf8.encode('service unavailable')),
+      });
+      final service = SnapStoreService(httpClient: http);
+
+      expect(
+        () => service.searchGadgetChannels('foobar'),
+        throwsA(isA<StoreException>().having(
+            (e) => e.message, 'message', contains('service unavailable'))),
+      );
+    });
+
     test('throws StoreException on empty channel-map', () async {
       final http = FakeStoreHttp({
         'https://api.snapcraft.io/v2/snaps/info/pc': (
