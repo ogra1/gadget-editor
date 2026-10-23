@@ -89,7 +89,9 @@ parts:
       cd $CRAFT_PART_SRC
       flutter pub get
 
-      # run flutter tests
+      # run flutter tests (and turn off proxy, else they fail)
+      export NO_PROXY="127.0.0.1,localhost,${NO_PROXY}"
+      export no_proxy="127.0.0.1,localhost,${no_proxy}"
       flutter test
 
       # Build app
